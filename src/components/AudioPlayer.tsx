@@ -1,6 +1,6 @@
 
 import { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Download, RefreshCw } from 'lucide-react';
+import { Play, Pause, Download, RefreshCw } from 'lucide-react';
 
 interface AudioPlayerProps {
   originalAudioUrl?: string;
@@ -8,6 +8,7 @@ interface AudioPlayerProps {
   onTogglePlay: (isPlaying: boolean) => void;
   isProcessing: boolean;
   songTitle?: string;
+  thumbnailUrl?: string;
 }
 
 const AudioPlayer = ({ 
@@ -15,7 +16,8 @@ const AudioPlayer = ({
   lofiAudioUrl, 
   onTogglePlay,
   isProcessing,
-  songTitle
+  songTitle,
+  thumbnailUrl
 }: AudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -103,16 +105,6 @@ const AudioPlayer = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
   
-  const skipBackward = () => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
-  };
-  
-  const skipForward = () => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
-  };
-  
   const downloadLofi = () => {
     if (!lofiAudioUrl) return;
     
@@ -128,108 +120,105 @@ const AudioPlayer = ({
     <div className="w-full glass-panel p-6 animate-fade-in-up delay-400">
       <audio ref={audioRef} />
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-medium truncate">
-            {songTitle || 'Audio Track'}
-          </h3>
-          
-          <div className="flex items-center mt-1">
-            <button
-              onClick={() => setIsPlayingOriginal(true)}
-              className={`text-xs px-3 py-1 rounded-l-md ${
-                isPlayingOriginal 
-                  ? 'bg-accent text-white' 
-                  : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
-              }`}
-              disabled={!originalAudioUrl || isProcessing}
-            >
-              Original
-            </button>
-            <button
-              onClick={() => setIsPlayingOriginal(false)}
-              className={`text-xs px-3 py-1 rounded-r-md ${
-                !isPlayingOriginal 
-                  ? 'bg-accent text-white' 
-                  : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
-              }`}
-              disabled={!lofiAudioUrl || isProcessing}
-            >
-              Lo-fi
-            </button>
+      <div className="flex flex-col md:flex-row gap-6">
+        {/* Thumbnail display */}
+        {thumbnailUrl && (
+          <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden shrink-0">
+            <img 
+              src={thumbnailUrl} 
+              alt={songTitle || "YouTube thumbnail"} 
+              className="w-full h-full object-cover"
+            />
           </div>
-        </div>
+        )}
         
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={skipBackward}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-200 dark:bg-lofi-800 text-lofi-800 dark:text-lofi-100 hover:bg-lofi-300 dark:hover:bg-lofi-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!originalAudioUrl || isProcessing}
-            aria-label="Rewind 10 seconds"
-          >
-            <SkipBack size={16} />
-          </button>
-          
-          <button
-            onClick={togglePlay}
-            className="w-14 h-14 rounded-full flex items-center justify-center bg-accent text-white hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow"
-            disabled={(isPlayingOriginal ? !originalAudioUrl : !lofiAudioUrl) || isProcessing}
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
-          </button>
-          
-          <button
-            onClick={skipForward}
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-200 dark:bg-lofi-800 text-lofi-800 dark:text-lofi-100 hover:bg-lofi-300 dark:hover:bg-lofi-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!originalAudioUrl || isProcessing}
-            aria-label="Skip forward 10 seconds"
-          >
-            <SkipForward size={16} />
-          </button>
-          
-          {lofiAudioUrl && (
-            <button
-              onClick={downloadLofi}
-              className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-600 dark:bg-lofi-700 text-white hover:bg-lofi-700 dark:hover:bg-lofi-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isProcessing}
-              aria-label="Download Lo-fi track"
-            >
-              <Download size={16} />
-            </button>
-          )}
-          
-          {isProcessing && (
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-200 dark:bg-lofi-800">
-              <RefreshCw size={16} className="animate-spin" />
+        <div className="flex-1 flex flex-col justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-medium truncate">
+                {songTitle || 'Audio Track'}
+              </h3>
+              
+              <div className="flex items-center mt-1">
+                <button
+                  onClick={() => setIsPlayingOriginal(true)}
+                  className={`text-xs px-3 py-1 rounded-l-md ${
+                    isPlayingOriginal 
+                      ? 'bg-accent text-white' 
+                      : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
+                  }`}
+                  disabled={!originalAudioUrl || isProcessing}
+                >
+                  Original
+                </button>
+                <button
+                  onClick={() => setIsPlayingOriginal(false)}
+                  className={`text-xs px-3 py-1 rounded-r-md ${
+                    !isPlayingOriginal 
+                      ? 'bg-accent text-white' 
+                      : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
+                  }`}
+                  disabled={!lofiAudioUrl || isProcessing}
+                >
+                  Lo-fi
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="mt-4">
-        <div className="flex items-center space-x-2 mb-1">
-          <span className="text-xs font-mono text-lofi-600 dark:text-lofi-400">
-            {formatTime(currentTime)}
-          </span>
-          <div className="relative flex-1 h-2 bg-lofi-200 dark:bg-lofi-800 rounded-full overflow-hidden">
-            <input
-              type="range"
-              min="0"
-              max={duration || 0}
-              value={currentTime}
-              onChange={seek}
-              disabled={!originalAudioUrl || isProcessing}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            />
-            <div 
-              className="absolute top-0 left-0 h-full bg-accent"
-              style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
-            />
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={togglePlay}
+                className="w-14 h-14 rounded-full flex items-center justify-center bg-accent text-white hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow"
+                disabled={(isPlayingOriginal ? !originalAudioUrl : !lofiAudioUrl) || isProcessing}
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+              </button>
+              
+              {lofiAudioUrl && (
+                <button
+                  onClick={downloadLofi}
+                  className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-600 dark:bg-lofi-700 text-white hover:bg-lofi-700 dark:hover:bg-lofi-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isProcessing}
+                  aria-label="Download Lo-fi track"
+                >
+                  <Download size={16} />
+                </button>
+              )}
+              
+              {isProcessing && (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-200 dark:bg-lofi-800">
+                  <RefreshCw size={16} className="animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
-          <span className="text-xs font-mono text-lofi-600 dark:text-lofi-400">
-            {formatTime(duration)}
-          </span>
+          
+          <div className="mt-4">
+            <div className="flex items-center space-x-2 mb-1">
+              <span className="text-xs font-mono text-lofi-600 dark:text-lofi-400">
+                {formatTime(currentTime)}
+              </span>
+              <div className="relative flex-1 h-2 bg-lofi-200 dark:bg-lofi-800 rounded-full overflow-hidden">
+                <input
+                  type="range"
+                  min="0"
+                  max={duration || 0}
+                  value={currentTime}
+                  onChange={seek}
+                  disabled={!originalAudioUrl || isProcessing}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div 
+                  className="absolute top-0 left-0 h-full bg-accent"
+                  style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
+                />
+              </div>
+              <span className="text-xs font-mono text-lofi-600 dark:text-lofi-400">
+                {formatTime(duration)}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

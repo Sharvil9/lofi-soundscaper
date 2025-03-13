@@ -14,6 +14,7 @@ const Index = () => {
   const [originalAudioUrl, setOriginalAudioUrl] = useState<string | undefined>();
   const [lofiAudioUrl, setLofiAudioUrl] = useState<string | undefined>();
   const [songTitle, setSongTitle] = useState<string | undefined>();
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | undefined>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
     tempo: 85,
@@ -28,12 +29,14 @@ const Index = () => {
     setOriginalAudioUrl(undefined);
     setLofiAudioUrl(undefined);
     setSongTitle(undefined);
+    setThumbnailUrl(undefined);
     
     try {
       const response = await fetchYouTubeAudio(url);
       
       setOriginalAudioUrl(response.audioUrl);
       setSongTitle(response.title);
+      setThumbnailUrl(response.thumbnailUrl);
       
       // Process lo-fi version
       setIsProcessing(true);
@@ -114,6 +117,7 @@ const Index = () => {
                   onTogglePlay={setIsPlaying}
                   isProcessing={isProcessing}
                   songTitle={songTitle}
+                  thumbnailUrl={thumbnailUrl}
                 />
               </>
             )}

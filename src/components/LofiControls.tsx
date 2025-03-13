@@ -83,13 +83,13 @@ const LofiControls = ({ onChange, isProcessing }: LofiControlsProps) => {
       <div className="flex flex-col md:flex-row md:items-start gap-8">
         <div className="w-full md:w-auto shrink-0">
           <h3 className="text-lg font-medium mb-4 text-center md:text-left">Presets</h3>
-          <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+          <div className="grid grid-cols-2 gap-2 max-w-[200px]">
             {['chill', 'study', 'sleep', 'deep'].map(preset => (
               <button
                 key={preset}
                 onClick={() => applyPreset(preset)}
                 disabled={isProcessing}
-                className="px-4 py-2 rounded-full text-sm font-medium bg-lofi-200 dark:bg-lofi-800 hover:bg-lofi-300 dark:hover:bg-lofi-700 transition-all duration-200 capitalize disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="px-4 py-2 rounded-full text-sm font-medium bg-lofi-200 dark:bg-lofi-800 hover:bg-lofi-300 dark:hover:bg-lofi-700 transition-all duration-200 capitalize disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-1"
               >
                 <Wand2 size={14} />
                 <span>{preset}</span>

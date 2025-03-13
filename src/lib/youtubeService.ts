@@ -7,6 +7,7 @@ import { toast } from "sonner";
 interface YouTubeApiResponse {
   title: string;
   audioUrl: string;
+  thumbnailUrl: string;
 }
 
 export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiResponse> => {
@@ -28,6 +29,9 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
     const videoId = videoIdMatch ? videoIdMatch[0] : "";
     
     console.log("Fetching audio for YouTube video:", videoId);
+    
+    // Get the thumbnail URL from the video ID
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
     
     // Simulate API delay
     setTimeout(() => {
@@ -51,7 +55,8 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
       
       resolve({
         title,
-        audioUrl
+        audioUrl,
+        thumbnailUrl
       });
       
       toast.success("Audio extracted successfully");
