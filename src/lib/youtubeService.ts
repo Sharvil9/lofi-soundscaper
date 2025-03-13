@@ -1,8 +1,10 @@
 
 import { toast } from "sonner";
+import { LofiSettings } from "@/components/LofiControls";
 
-// This would use a backend service in a real application
-// For demo purposes, we're simulating the API calls
+// YouTube audio extraction and lo-fi processing backend API URL
+// This would point to your deployed backend service
+const BACKEND_API_URL = "https://your-backend-service.com/api";
 
 interface YouTubeApiResponse {
   title: string;
@@ -11,32 +13,107 @@ interface YouTubeApiResponse {
 }
 
 export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiResponse> => {
-  // This is a simulation function only
-  // In a real app, this would call a backend API
-
-  return new Promise((resolve, reject) => {
+  try {
+    console.log("Fetching audio for YouTube video:", youtubeUrl);
+    
     // Check if it's a valid YouTube URL
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(&.*)?$/;
     
     if (!youtubeRegex.test(youtubeUrl)) {
       toast.error("Invalid YouTube URL");
-      reject(new Error("Invalid YouTube URL"));
-      return;
+      throw new Error("Invalid YouTube URL");
     }
     
-    // Extract video ID from URL
+    // Extract video ID for thumbnail generation
     const videoIdMatch = youtubeUrl.match(/([a-zA-Z0-9_-]{11})/);
     const videoId = videoIdMatch ? videoIdMatch[0] : "";
-    
-    console.log("Fetching audio for YouTube video:", videoId);
     
     // Get the thumbnail URL from the video ID
     const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
     
+    // In development mode, use the fake audio service
+    if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      return simulateAudioExtraction(videoId, thumbnailUrl);
+    }
+    
+    // Call the backend API to extract audio
+    const response = await fetch(`${BACKEND_API_URL}/extract`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ youtubeUrl }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      toast.error(errorData.message || "Failed to extract audio");
+      throw new Error(errorData.message || "Failed to extract audio");
+    }
+    
+    const data = await response.json();
+    toast.success("Audio extracted successfully");
+    
+    return {
+      title: data.title,
+      audioUrl: data.audioUrl,
+      thumbnailUrl
+    };
+  } catch (error) {
+    console.error("Error fetching YouTube audio:", error);
+    toast.error("Failed to extract audio from YouTube");
+    throw error;
+  }
+};
+
+export const createLofiVersion = async (
+  audioUrl: string, 
+  settings: LofiSettings
+): Promise<string> => {
+  try {
+    console.log("Creating lo-fi version with settings:", settings);
+    
+    // In development mode, use the fake processing service
+    if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      return simulateLofiProcessing(audioUrl, settings);
+    }
+    
+    // Call the backend API to process audio
+    const response = await fetch(`${BACKEND_API_URL}/process`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        audioUrl,
+        settings
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      toast.error(errorData.message || "Failed to process audio");
+      throw new Error(errorData.message || "Failed to process audio");
+    }
+    
+    const data = await response.json();
+    toast.success("Lo-fi conversion complete");
+    
+    // Return the URL to the processed audio
+    return data.processedAudioUrl;
+  } catch (error) {
+    console.error("Error creating lo-fi version:", error);
+    toast.error("Failed to create lo-fi version");
+    throw error;
+  }
+};
+
+// Simulated functions for development/testing
+const simulateAudioExtraction = (videoId: string, thumbnailUrl: string): Promise<YouTubeApiResponse> => {
+  return new Promise((resolve) => {
     // Simulate API delay
     setTimeout(() => {
       // Use a placeholder audio URL for demo purposes
-      // In a real app, this would be generated from your backend service
       const audioSamples = [
         "https://cdn.freesound.org/previews/633/633687_14015493-lq.mp3", // Piano melody
         "https://cdn.freesound.org/previews/612/612295_5674468-lq.mp3",  // Acoustic guitar
@@ -64,28 +141,12 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
   });
 };
 
-export const createLofiVersion = async (
-  audioUrl: string, 
-  settings: {
-    tempo: number;
-    reverb: number;
-    filter: number;
-    noise: number;
-    bitcrusher: number;
-  }
-): Promise<string> => {
-  // This is a simulation function only
-  // In a real app, this would call a backend API to process audio
-  
-  return new Promise((resolve, reject) => {
-    console.log("Creating lo-fi version with settings:", settings);
-    
-    // Simulate processing time
+const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promise<string> => {
+  return new Promise((resolve) => {
+    // Simulate processing time based on complexity of settings
     const processingTime = 3000 + Math.random() * 2000; // 3-5 seconds
     
     setTimeout(() => {
-      // In a real app, this would return a new URL to the processed audio
-      // For demonstration, we'll return the same URL
       toast.success("Lo-fi conversion complete");
       resolve(audioUrl);
     }, processingTime);
