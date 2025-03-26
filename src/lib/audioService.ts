@@ -61,10 +61,22 @@ export const processToLofi = async (
     // For now, we're using the same processing function for all platforms
     // In the future, this could be extended for platform-specific processing
     if (audioSource.platform === "youtube") {
-      return createLofiVersion(audioSource.audioUrl, settings);
+      // Make sure we're getting a proper URL back from the processing
+      const processedUrl = await createLofiVersion(audioSource.audioUrl, settings);
+      console.log("Processed audio URL:", processedUrl);
+      
+      // Ensure the URL is valid
+      if (!processedUrl || typeof processedUrl !== 'string') {
+        console.error("Invalid processed URL received:", processedUrl);
+        throw new Error("Invalid processed audio URL");
+      }
+      
+      return processedUrl;
     } else {
       // For other platforms, use a simpler approach for now
-      return simulateLofiProcessing(audioSource.audioUrl, settings);
+      const processedUrl = await simulateLofiProcessing(audioSource.audioUrl, settings);
+      console.log("Processed audio URL (simulated):", processedUrl);
+      return processedUrl;
     }
   } catch (error) {
     console.error("Error processing to lo-fi:", error);
@@ -103,7 +115,14 @@ const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promi
     
     setTimeout(() => {
       toast.success("Lo-fi conversion complete");
-      resolve(audioUrl);
+      // For development/demo, return a different sample to distinguish from original
+      const lofiSamples = [
+        "https://cdn.freesound.org/previews/632/632724_13435817-lq.mp3", // Lo-fi beat
+        "https://cdn.freesound.org/previews/631/631443_11861866-lq.mp3"  // Another lo-fi sample
+      ];
+      const randomSample = lofiSamples[Math.floor(Math.random() * lofiSamples.length)];
+      console.log("Using simulated lo-fi audio:", randomSample);
+      resolve(randomSample);
     }, processingTime);
   });
 };

@@ -63,32 +63,60 @@ const AudioPlayer = ({
     };
   }, [onTogglePlay]);
   
+  // This effect watches for changes in the audio URLs or playback mode
   useEffect(() => {
     if (!audioRef.current) return;
     
-    if (isPlayingOriginal) {
-      audioRef.current.src = originalAudioUrl || '';
-    } else {
-      audioRef.current.src = lofiAudioUrl || '';
-    }
+    // Get the appropriate URL based on which version we're playing
+    const currentUrl = isPlayingOriginal ? originalAudioUrl : lofiAudioUrl;
     
-    // If it was playing before switching, start playing again
-    if (isPlaying) {
-      audioRef.current.play();
+    // Only update if we have a valid URL
+    if (currentUrl) {
+      console.log(`Loading ${isPlayingOriginal ? 'original' : 'lo-fi'} audio:`, currentUrl);
+      audioRef.current.src = currentUrl;
+      
+      // Reset state when changing audio source
+      setCurrentTime(0);
+      
+      // If it was playing before switching, load and start playing again
+      if (isPlaying) {
+        audioRef.current.load(); // Force reload of the audio
+        const playPromise = audioRef.current.play();
+        
+        // Handle play promise to avoid uncaught promise errors
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Error playing audio:", error);
+            setIsPlaying(false);
+            onTogglePlay(false);
+          });
+        }
+      }
     }
-  }, [isPlayingOriginal, originalAudioUrl, lofiAudioUrl]);
+  }, [isPlayingOriginal, originalAudioUrl, lofiAudioUrl, isPlaying, onTogglePlay]);
   
   const togglePlay = () => {
     if (!audioRef.current) return;
     
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
+      onTogglePlay(false);
     } else {
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            setIsPlaying(true);
+            onTogglePlay(true);
+          })
+          .catch(error => {
+            console.error("Error playing audio:", error);
+            setIsPlaying(false);
+            onTogglePlay(false);
+          });
+      }
     }
-    
-    setIsPlaying(!isPlaying);
-    onTogglePlay(!isPlaying);
   };
   
   const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
