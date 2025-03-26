@@ -1,5 +1,5 @@
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Play, Pause, Download, RefreshCw } from 'lucide-react';
 
 interface AudioPlayerProps {
@@ -9,22 +9,80 @@ interface AudioPlayerProps {
   isProcessing: boolean;
   songTitle?: string;
   thumbnailUrl?: string;
+  isPlaying?: boolean;
+  autoPlayLofi?: boolean;
 }
 
-const AudioPlayer = ({ 
+// Create a type that allows ref forwarding
+const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({ 
   originalAudioUrl, 
   lofiAudioUrl, 
   onTogglePlay,
   isProcessing,
   songTitle,
-  thumbnailUrl
-}: AudioPlayerProps) => {
+  thumbnailUrl,
+  isPlaying: externalIsPlaying,
+  autoPlayLofi = false
+}, ref) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlayingOriginal, setIsPlayingOriginal] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Forward the audio element ref to the parent component
+  useImperativeHandle(ref, () => audioRef.current);
+  
+  // Sync external isPlaying state with internal state
+  useEffect(() => {
+    if (externalIsPlaying !== undefined) {
+      setIsPlaying(externalIsPlaying);
+      
+      // If we're told to play and we have an audio element, play it
+      if (externalIsPlaying && audioRef.current) {
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Error playing audio from external state change:", error);
+            setIsPlaying(false);
+            onTogglePlay(false);
+          });
+        }
+      } else if (!externalIsPlaying && audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
+  }, [externalIsPlaying, onTogglePlay]);
+  
+  // Handle auto-play of lofi version when it becomes available
+  useEffect(() => {
+    if (autoPlayLofi && lofiAudioUrl && !isPlayingOriginal) {
+      // Auto switch to lo-fi version when it's available
+      setIsPlayingOriginal(false);
+      
+      if (audioRef.current) {
+        // Load the new audio
+        audioRef.current.src = lofiAudioUrl;
+        audioRef.current.load();
+        
+        // Play it automatically
+        console.log("Auto-playing lo-fi audio");
+        const playPromise = audioRef.current.play();
+        
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setIsPlaying(true);
+              onTogglePlay(true);
+            })
+            .catch(error => {
+              console.error("Error auto-playing lo-fi audio:", error);
+            });
+        }
+      }
+    }
+  }, [lofiAudioUrl, autoPlayLofi, isPlayingOriginal, onTogglePlay]);
   
   useEffect(() => {
     if (!audioRef.current) return;
@@ -251,6 +309,9 @@ const AudioPlayer = ({
       </div>
     </div>
   );
-};
+});
+
+// Add a display name for debugging purposes
+AudioPlayer.displayName = "AudioPlayer";
 
 export default AudioPlayer;

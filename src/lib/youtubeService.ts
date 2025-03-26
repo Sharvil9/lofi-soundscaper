@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
 
@@ -11,6 +12,7 @@ interface YouTubeApiResponse {
   title: string;
   audioUrl: string;
   thumbnailUrl: string;
+  originalFileId?: string; // Added to track original file
 }
 
 export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiResponse> => {
@@ -58,7 +60,8 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
     return {
       title: data.title,
       audioUrl: data.audioUrl,
-      thumbnailUrl
+      thumbnailUrl,
+      originalFileId: data.originalFileId
     };
   } catch (error) {
     console.error("Error fetching YouTube audio:", error);
@@ -69,7 +72,8 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
 
 export const createLofiVersion = async (
   audioUrl: string, 
-  settings: LofiSettings
+  settings: LofiSettings,
+  autoDelete: boolean = true
 ): Promise<string> => {
   try {
     console.log("Creating lo-fi version with settings:", settings);
@@ -87,7 +91,8 @@ export const createLofiVersion = async (
       },
       body: JSON.stringify({
         audioUrl,
-        settings
+        settings,
+        deleteOriginal: autoDelete
       }),
     });
     
@@ -98,6 +103,33 @@ export const createLofiVersion = async (
     }
     
     const data = await response.json();
+    
+    // Check if original file was deleted
+    if (data.originalDeleted) {
+      console.log("Original audio file was automatically deleted");
+    } else if (autoDelete) {
+      // If auto-delete was requested but didn't happen, try using the cleanup endpoint
+      const fileIdMatch = data.processedAudioUrl.match(/\/processed\/(.+)\.mp3/);
+      if (fileIdMatch && fileIdMatch[1]) {
+        const processedFileId = fileIdMatch[1];
+        try {
+          console.log("Requesting cleanup of original file");
+          await fetch(`${BACKEND_API_URL}/cleanup`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              processedFileId
+            }),
+          });
+        } catch (cleanupError) {
+          console.error("Error during cleanup:", cleanupError);
+          // Don't throw error here, just log it
+        }
+      }
+    }
+    
     toast.success("Lo-fi conversion complete");
     
     // Return the URL to the processed audio
@@ -134,7 +166,8 @@ const simulateAudioExtraction = (videoId: string, thumbnailUrl: string): Promise
       resolve({
         title,
         audioUrl,
-        thumbnailUrl
+        thumbnailUrl,
+        originalFileId: `sim-${Date.now()}`
       });
       
       toast.success("Audio extracted successfully");
@@ -149,7 +182,14 @@ const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promi
     
     setTimeout(() => {
       toast.success("Lo-fi conversion complete");
-      resolve(audioUrl);
+      // For development/demo, return a different sample to distinguish from original
+      const lofiSamples = [
+        "https://cdn.freesound.org/previews/632/632724_13435817-lq.mp3", // Lo-fi beat
+        "https://cdn.freesound.org/previews/631/631443_11861866-lq.mp3"  // Another lo-fi sample
+      ];
+      const randomSample = lofiSamples[Math.floor(Math.random() * lofiSamples.length)];
+      console.log("Using simulated lo-fi audio:", randomSample);
+      resolve(randomSample);
     }, processingTime);
   });
 };

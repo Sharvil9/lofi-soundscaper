@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const ytdl = require('youtube-dl-exec');
@@ -18,6 +17,9 @@ if (!fs.existsSync(uploadsDir)) {
 if (!fs.existsSync(processedDir)) {
   fs.mkdirSync(processedDir, { recursive: true });
 }
+
+// Keep track of original audio files for cleanup
+const audioFilesMap = new Map();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -48,11 +50,11 @@ app.post('/api/extract', async (req, res) => {
       preferFreeFormats: true,
     });
     
-    // Download audio only
+    // Download audio only with highest quality
     await ytdl.exec(youtubeUrl, {
       extractAudio: true,
       audioFormat: 'mp3',
-      audioQuality: 0, // best
+      audioQuality: 0, // best quality
       output: outputPath,
       noCheckCertificates: true,
       noWarnings: true,
@@ -64,6 +66,7 @@ app.post('/api/extract', async (req, res) => {
     res.json({
       title: videoInfo.title,
       audioUrl: audioUrl,
+      originalFileId: fileId, // Track for cleanup later
     });
   } catch (error) {
     console.error('Error extracting audio:', error);
@@ -74,7 +77,7 @@ app.post('/api/extract', async (req, res) => {
 // Process audio with lo-fi effects
 app.post('/api/process', async (req, res) => {
   try {
-    const { audioUrl, settings } = req.body;
+    const { audioUrl, settings, deleteOriginal } = req.body;
     
     if (!audioUrl || !settings) {
       return res.status(400).json({ message: 'Audio URL and settings are required' });
@@ -90,6 +93,12 @@ app.post('/api/process', async (req, res) => {
     const inputPath = path.join(uploadsDir, `${fileId}.mp3`);
     const outputId = uuidv4();
     const outputPath = path.join(processedDir, `${outputId}.mp3`);
+    
+    // Save file IDs for mapping and cleanup
+    audioFilesMap.set(outputId, {
+      originalId: fileId,
+      originalPath: inputPath
+    });
     
     // Apply lo-fi effects using ffmpeg
     const command = ffmpeg(inputPath);
@@ -132,9 +141,21 @@ app.post('/api/process', async (req, res) => {
       .output(outputPath)
       .on('end', () => {
         console.log('Processing finished');
+        
+        // Delete original file if requested
+        if (deleteOriginal === true) {
+          try {
+            fs.unlinkSync(inputPath);
+            console.log(`Deleted original file: ${inputPath}`);
+          } catch (err) {
+            console.error(`Error deleting original file: ${err.message}`);
+          }
+        }
+        
         res.json({
           processedAudioUrl: `/processed/${outputId}.mp3`,
-          message: 'Audio processed successfully'
+          message: 'Audio processed successfully',
+          originalDeleted: deleteOriginal === true
         });
       })
       .on('error', (err) => {
@@ -145,6 +166,38 @@ app.post('/api/process', async (req, res) => {
   } catch (error) {
     console.error('Error processing audio:', error);
     res.status(500).json({ message: 'Failed to process audio', error: error.message });
+  }
+});
+
+// Cleanup endpoint - delete original file after successful processing
+app.post('/api/cleanup', (req, res) => {
+  try {
+    const { processedFileId } = req.body;
+    
+    if (!processedFileId) {
+      return res.status(400).json({ message: 'Processed file ID is required' });
+    }
+    
+    const fileInfo = audioFilesMap.get(processedFileId);
+    
+    if (!fileInfo) {
+      return res.status(404).json({ message: 'File mapping not found' });
+    }
+    
+    if (fs.existsSync(fileInfo.originalPath)) {
+      fs.unlinkSync(fileInfo.originalPath);
+      console.log(`Cleanup: Deleted original file: ${fileInfo.originalPath}`);
+      
+      // Remove the mapping after cleanup
+      audioFilesMap.delete(processedFileId);
+      
+      return res.json({ message: 'Original file deleted successfully' });
+    } else {
+      return res.json({ message: 'Original file already deleted or not found' });
+    }
+  } catch (error) {
+    console.error('Error during cleanup:', error);
+    res.status(500).json({ message: 'Failed to clean up files', error: error.message });
   }
 });
 

@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
 import LofiControls, { LofiSettings } from '@/components/LofiControls';
@@ -16,6 +16,7 @@ const Index = () => {
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [lofiAudioUrl, setLofiAudioUrl] = useState<string | undefined>();
   const [isPlaying, setIsPlaying] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
     tempo: 85,
     reverb: 30,
@@ -28,14 +29,23 @@ const Index = () => {
     setIsLoading(true);
     setAudioSource(null);
     setLofiAudioUrl(undefined);
+    setIsPlaying(false);
     
     try {
+      // Extract the audio from the URL
       const source = await extractAudio(url);
       setAudioSource(source);
       
+      // Immediately process to lo-fi with auto-delete of original
       setIsProcessing(true);
-      const lofiUrl = await processToLofi(source, lofiSettings);
+      const lofiUrl = await processToLofi(source, lofiSettings, true);
       setLofiAudioUrl(lofiUrl);
+      
+      // Auto-play the processed lo-fi version
+      setTimeout(() => {
+        setIsPlaying(true);
+      }, 500); // Small delay to ensure player is ready
+      
     } catch (error) {
       console.error("Error processing media:", error);
       toast.error("Failed to process media link");
@@ -54,11 +64,19 @@ const Index = () => {
     
     setIsProcessing(true);
     setLofiAudioUrl(undefined);
+    setIsPlaying(false);
     
     try {
-      const lofiUrl = await processToLofi(audioSource, lofiSettings);
+      // Process with auto-delete of original
+      const lofiUrl = await processToLofi(audioSource, lofiSettings, true);
       setLofiAudioUrl(lofiUrl);
       toast.success("Lo-fi settings applied");
+      
+      // Auto-play the newly processed lo-fi version
+      setTimeout(() => {
+        setIsPlaying(true);
+      }, 500); // Small delay to ensure player is ready
+      
     } catch (error) {
       console.error("Error applying lo-fi settings:", error);
       toast.error("Failed to apply lo-fi settings");
@@ -66,6 +84,21 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
+  
+  // This effect ensures autoplay works when lofiAudioUrl changes
+  useEffect(() => {
+    if (lofiAudioUrl && isPlaying && audioPlayerRef.current) {
+      console.log("Auto-playing lo-fi version");
+      const playPromise = audioPlayerRef.current.play();
+      
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Error auto-playing audio:", error);
+          setIsPlaying(false);
+        });
+      }
+    }
+  }, [lofiAudioUrl, isPlaying]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-lofi-100 dark:from-background dark:to-lofi-900 transition-colors duration-500">
@@ -115,6 +148,9 @@ const Index = () => {
                   isProcessing={isProcessing}
                   songTitle={audioSource.title}
                   thumbnailUrl={audioSource.thumbnailUrl}
+                  isPlaying={isPlaying}
+                  ref={audioPlayerRef}
+                  autoPlayLofi={true}
                 />
               </>
             )}

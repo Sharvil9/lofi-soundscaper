@@ -7,6 +7,7 @@ export interface AudioSource {
   audioUrl: string;
   thumbnailUrl: string;
   platform: "youtube" | "soundcloud" | "other";
+  originalFileId?: string; // Track the original file ID for deletion
 }
 
 // Detect the platform from the URL
@@ -52,7 +53,8 @@ export const extractAudio = async (url: string): Promise<AudioSource> => {
 // Process audio to lo-fi from any platform
 export const processToLofi = async (
   audioSource: AudioSource,
-  settings: LofiSettings
+  settings: LofiSettings,
+  autoDelete: boolean = true
 ): Promise<string> => {
   try {
     // Log the processing attempt
@@ -62,7 +64,7 @@ export const processToLofi = async (
     // In the future, this could be extended for platform-specific processing
     if (audioSource.platform === "youtube") {
       // Make sure we're getting a proper URL back from the processing
-      const processedUrl = await createLofiVersion(audioSource.audioUrl, settings);
+      const processedUrl = await createLofiVersion(audioSource.audioUrl, settings, autoDelete);
       console.log("Processed audio URL:", processedUrl);
       
       // Ensure the URL is valid
