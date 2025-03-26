@@ -1,7 +1,8 @@
 
 import { useState } from 'react';
-import { YoutubeIcon, XIcon, SearchIcon } from 'lucide-react';
+import { YoutubeIcon, XIcon, SearchIcon, MusicIcon } from 'lucide-react';
 import { toast } from "sonner";
+import { detectPlatform } from '@/lib/audioService';
 
 interface YouTubeInputProps {
   onSubmit: (url: string) => void;
@@ -11,21 +12,26 @@ interface YouTubeInputProps {
 const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
   const [url, setUrl] = useState('');
   
-  const isValidYouTubeUrl = (url: string) => {
+  const isValidMediaUrl = (url: string) => {
+    // YouTube URL validation
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(&.*)?$/;
-    return youtubeRegex.test(url);
+    
+    // SoundCloud URL validation (basic pattern)
+    const soundcloudRegex = /^(https?:\/\/)?(www\.)?soundcloud\.com\/[\w-]+\/[\w-]+/;
+    
+    return youtubeRegex.test(url) || soundcloudRegex.test(url);
   };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!url.trim()) {
-      toast.error("Please enter a YouTube URL");
+      toast.error("Please enter a media URL");
       return;
     }
     
-    if (!isValidYouTubeUrl(url)) {
-      toast.error("Please enter a valid YouTube URL");
+    if (!isValidMediaUrl(url)) {
+      toast.error("Please enter a valid YouTube or SoundCloud URL");
       return;
     }
     
@@ -36,23 +42,40 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
     setUrl('');
   };
 
+  // Determine which platform icon to show
+  const getPlatformIcon = () => {
+    if (!url.trim()) return <MusicIcon size={20} />;
+    
+    const platform = detectPlatform(url);
+    switch (platform) {
+      case 'youtube':
+        return <YoutubeIcon size={20} />;
+      case 'soundcloud':
+        return <MusicIcon size={20} className="text-orange-400" />;
+      default:
+        return <MusicIcon size={20} />;
+    }
+  };
+
   return (
     <div className="w-full max-w-2xl mx-auto animate-fade-in-up">
       <div className="mb-3 text-center">
-        <p className="text-sm uppercase tracking-widest text-lofi-500 dark:text-lofi-400">Start by pasting a YouTube link</p>
+        <p className="text-sm uppercase tracking-widest text-lofi-500 dark:text-lofi-400">
+          Start by pasting a YouTube or SoundCloud link
+        </p>
       </div>
       
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative group">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lofi-400">
-            <YoutubeIcon size={20} />
+            {getPlatformIcon()}
           </div>
           
           <input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/watch?v=..."
+            placeholder="https://youtube.com/watch?v=... or https://soundcloud.com/..."
             className="w-full h-14 pl-12 pr-24 rounded-xl border border-lofi-200 dark:border-lofi-700 bg-white dark:bg-lofi-900 focus:border-accent focus:ring-2 focus:ring-accent/20 shadow-sm transition-all duration-300 text-lofi-800 dark:text-lofi-100"
             disabled={isLoading}
           />

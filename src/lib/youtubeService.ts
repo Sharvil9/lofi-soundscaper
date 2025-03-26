@@ -1,10 +1,11 @@
-
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
 
 // YouTube audio extraction and lo-fi processing backend API URL
-// This would point to your deployed backend service
-const BACKEND_API_URL = "https://your-backend-service.com/api";
+// Use localhost for development, otherwise use the deployed backend URL
+const BACKEND_API_URL = import.meta.env.DEV 
+  ? "http://localhost:3001/api" 
+  : "https://your-backend-service.com/api";
 
 interface YouTubeApiResponse {
   title: string;
@@ -28,10 +29,10 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
     const videoIdMatch = youtubeUrl.match(/([a-zA-Z0-9_-]{11})/);
     const videoId = videoIdMatch ? videoIdMatch[0] : "";
     
-    // Get the thumbnail URL from the video ID
-    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+    // Get the thumbnail URL from the video ID - use high quality version
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
     
-    // In development mode, use the fake audio service
+    // In development mode, use the fake audio service if not using real backend
     if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
       return simulateAudioExtraction(videoId, thumbnailUrl);
     }
@@ -73,7 +74,7 @@ export const createLofiVersion = async (
   try {
     console.log("Creating lo-fi version with settings:", settings);
     
-    // In development mode, use the fake processing service
+    // In development mode, use the fake processing service if not using real backend
     if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
       return simulateLofiProcessing(audioUrl, settings);
     }

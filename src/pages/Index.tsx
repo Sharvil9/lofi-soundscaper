@@ -1,20 +1,18 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
 import LofiControls, { LofiSettings } from '@/components/LofiControls';
 import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
-import { fetchYouTubeAudio, createLofiVersion } from '@/lib/youtubeService';
+import ThumbnailDisplay from '@/components/ThumbnailDisplay';
+import { extractAudio, processToLofi, AudioSource } from '@/lib/audioService';
 import { toast } from "sonner";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [originalAudioUrl, setOriginalAudioUrl] = useState<string | undefined>();
+  const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [lofiAudioUrl, setLofiAudioUrl] = useState<string | undefined>();
-  const [songTitle, setSongTitle] = useState<string | undefined>();
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | undefined>();
   const [isPlaying, setIsPlaying] = useState(false);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
     tempo: 85,
@@ -24,27 +22,21 @@ const Index = () => {
     bitcrusher: 10,
   });
   
-  const handleYouTubeSubmit = async (url: string) => {
+  const handleMediaSubmit = async (url: string) => {
     setIsLoading(true);
-    setOriginalAudioUrl(undefined);
+    setAudioSource(null);
     setLofiAudioUrl(undefined);
-    setSongTitle(undefined);
-    setThumbnailUrl(undefined);
     
     try {
-      const response = await fetchYouTubeAudio(url);
+      const source = await extractAudio(url);
+      setAudioSource(source);
       
-      setOriginalAudioUrl(response.audioUrl);
-      setSongTitle(response.title);
-      setThumbnailUrl(response.thumbnailUrl);
-      
-      // Process lo-fi version
       setIsProcessing(true);
-      const lofiUrl = await createLofiVersion(response.audioUrl, lofiSettings);
+      const lofiUrl = await processToLofi(source, lofiSettings);
       setLofiAudioUrl(lofiUrl);
     } catch (error) {
-      console.error("Error fetching YouTube audio:", error);
-      toast.error("Failed to process YouTube link");
+      console.error("Error processing media:", error);
+      toast.error("Failed to process media link");
     } finally {
       setIsLoading(false);
       setIsProcessing(false);
@@ -56,13 +48,13 @@ const Index = () => {
   }, []);
   
   const applyLofiSettings = async () => {
-    if (!originalAudioUrl) return;
+    if (!audioSource) return;
     
     setIsProcessing(true);
     setLofiAudioUrl(undefined);
     
     try {
-      const lofiUrl = await createLofiVersion(originalAudioUrl, lofiSettings);
+      const lofiUrl = await processToLofi(audioSource, lofiSettings);
       setLofiAudioUrl(lofiUrl);
       toast.success("Lo-fi settings applied");
     } catch (error) {
@@ -74,10 +66,10 @@ const Index = () => {
   };
   
   useEffect(() => {
-    if (originalAudioUrl && !isProcessing) {
+    if (audioSource && !isProcessing) {
       applyLofiSettings();
     }
-  }, [lofiSettings, originalAudioUrl]);
+  }, [lofiSettings, audioSource]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-lofi-100 dark:from-background dark:to-lofi-900 transition-colors duration-500">
@@ -95,35 +87,41 @@ const Index = () => {
           
           <div className="space-y-6">
             <YouTubeInput 
-              onSubmit={handleYouTubeSubmit}
+              onSubmit={handleMediaSubmit}
               isLoading={isLoading}
             />
             
-            {originalAudioUrl && (
+            {audioSource && (
               <>
+                <ThumbnailDisplay 
+                  thumbnailUrl={audioSource.thumbnailUrl}
+                  title={audioSource.title}
+                  isProcessing={isProcessing}
+                />
+                
                 <LofiControls 
                   onChange={handleSettingsChange}
                   isProcessing={isProcessing}
                 />
                 
                 <AudioVisualizer 
-                  audioUrl={isPlaying ? (lofiAudioUrl || originalAudioUrl) : undefined}
+                  audioUrl={isPlaying ? (lofiAudioUrl || audioSource.audioUrl) : undefined}
                   isPlaying={isPlaying}
                 />
                 
                 <AudioPlayer 
-                  originalAudioUrl={originalAudioUrl}
+                  originalAudioUrl={audioSource.audioUrl}
                   lofiAudioUrl={lofiAudioUrl}
                   onTogglePlay={setIsPlaying}
                   isProcessing={isProcessing}
-                  songTitle={songTitle}
-                  thumbnailUrl={thumbnailUrl}
+                  songTitle={audioSource.title}
+                  thumbnailUrl={audioSource.thumbnailUrl}
                 />
               </>
             )}
           </div>
           
-          {!originalAudioUrl && (
+          {!audioSource && (
             <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
               <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
                 <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
