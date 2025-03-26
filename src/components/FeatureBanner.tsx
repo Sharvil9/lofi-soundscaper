@@ -1,10 +1,10 @@
 
-import { MusicNote, Laptop, Headphones, Clock } from 'lucide-react';
+import { Music, Clock, Headphones, Laptop } from 'lucide-react';
 
 const FeatureBanner = () => {
   const features = [
     {
-      icon: <MusicNote size={28} className="text-accent" />,
+      icon: <Music size={28} className="text-accent" />,
       title: "Lo-fi Effects",
       description: "Transform any sound with authentic lo-fi processing"
     },
