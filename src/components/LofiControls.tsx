@@ -1,6 +1,8 @@
 
 import { useState, useEffect } from 'react';
-import { Volume2, Clock, Filter, BarChart2, Music, Wand2 } from 'lucide-react';
+import { Volume2, Clock, Filter, BarChart2, Music, Wand2, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 
 export interface LofiSettings {
   tempo: number;
@@ -13,9 +15,10 @@ export interface LofiSettings {
 interface LofiControlsProps {
   onChange: (settings: LofiSettings) => void;
   isProcessing: boolean;
+  onProcess: () => void;
 }
 
-const LofiControls = ({ onChange, isProcessing }: LofiControlsProps) => {
+const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) => {
   const [settings, setSettings] = useState<LofiSettings>({
     tempo: 85,      // Original: 100%, Lofi: 85%
     reverb: 30,     // 0-100 (percentage)
@@ -80,22 +83,27 @@ const LofiControls = ({ onChange, isProcessing }: LofiControlsProps) => {
 
   return (
     <div className="w-full p-6 glass-panel animate-fade-in-up delay-200">
-      <div className="flex flex-col md:flex-row md:items-start gap-8">
-        <div className="w-full md:w-auto shrink-0">
-          <h3 className="text-lg font-medium mb-4 text-center md:text-left">Presets</h3>
-          <div className="grid grid-cols-2 gap-2 max-w-[200px]">
-            {['chill', 'study', 'sleep', 'deep'].map(preset => (
-              <button
-                key={preset}
-                onClick={() => applyPreset(preset)}
-                disabled={isProcessing}
-                className="px-4 py-2 rounded-full text-sm font-medium bg-lofi-200 dark:bg-lofi-800 hover:bg-lofi-300 dark:hover:bg-lofi-700 transition-all duration-200 capitalize disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-1"
-              >
-                <Wand2 size={14} />
-                <span>{preset}</span>
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-col gap-8">
+        <div className="w-full">
+          <h3 className="text-lg font-medium mb-4 text-center">Presets</h3>
+          <Carousel className="max-w-md mx-auto">
+            <CarouselContent>
+              {['chill', 'study', 'sleep', 'deep'].map(preset => (
+                <CarouselItem key={preset} className="basis-1/2 md:basis-1/3">
+                  <button
+                    onClick={() => applyPreset(preset)}
+                    disabled={isProcessing}
+                    className="w-full px-4 py-2 rounded-full text-sm font-medium bg-lofi-200 dark:bg-lofi-800 hover:bg-lofi-300 dark:hover:bg-lofi-700 transition-all duration-200 capitalize disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-1"
+                  >
+                    <Wand2 size={14} />
+                    <span>{preset}</span>
+                  </button>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselPrevious className="hidden md:flex -left-4" />
+            <CarouselNext className="hidden md:flex -right-4" />
+          </Carousel>
         </div>
         
         <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
@@ -158,6 +166,17 @@ const LofiControls = ({ onChange, isProcessing }: LofiControlsProps) => {
             hint="Bit reduction"
             disabled={isProcessing}
           />
+        </div>
+        
+        <div className="flex justify-center mt-4">
+          <Button 
+            onClick={onProcess} 
+            disabled={isProcessing} 
+            className="bg-accent hover:bg-accent/90 text-white font-medium px-8 py-2"
+          >
+            <Play size={16} className="mr-2" />
+            Process Audio
+          </Button>
         </div>
       </div>
     </div>

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -5,6 +6,7 @@ import LofiControls, { LofiSettings } from '@/components/LofiControls';
 import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
 import ThumbnailDisplay from '@/components/ThumbnailDisplay';
+import FeatureBanner from '@/components/FeatureBanner';
 import { extractAudio, processToLofi, AudioSource } from '@/lib/audioService';
 import { toast } from "sonner";
 
@@ -64,12 +66,6 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-  
-  useEffect(() => {
-    if (audioSource && !isProcessing) {
-      applyLofiSettings();
-    }
-  }, [lofiSettings, audioSource]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-lofi-100 dark:from-background dark:to-lofi-900 transition-colors duration-500">
@@ -102,7 +98,10 @@ const Index = () => {
                 <LofiControls 
                   onChange={handleSettingsChange}
                   isProcessing={isProcessing}
+                  onProcess={applyLofiSettings}
                 />
+                
+                <FeatureBanner />
                 
                 <AudioVisualizer 
                   audioUrl={isPlaying ? (lofiAudioUrl || audioSource.audioUrl) : undefined}

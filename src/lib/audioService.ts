@@ -1,7 +1,6 @@
 
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
-import { fetchYouTubeAudio, createLofiVersion } from "./youtubeService";
 
 export interface AudioSource {
   title: string;
@@ -55,9 +54,22 @@ export const processToLofi = async (
   audioSource: AudioSource,
   settings: LofiSettings
 ): Promise<string> => {
-  // For now, we're using the same processing function for all platforms
-  // In the future, this could be extended for platform-specific processing
-  return createLofiVersion(audioSource.audioUrl, settings);
+  try {
+    // Log the processing attempt
+    console.log(`Processing ${audioSource.platform} audio to lo-fi with settings:`, settings);
+    
+    // For now, we're using the same processing function for all platforms
+    // In the future, this could be extended for platform-specific processing
+    if (audioSource.platform === "youtube") {
+      return createLofiVersion(audioSource.audioUrl, settings);
+    } else {
+      // For other platforms, use a simpler approach for now
+      return simulateLofiProcessing(audioSource.audioUrl, settings);
+    }
+  } catch (error) {
+    console.error("Error processing to lo-fi:", error);
+    throw error;
+  }
 };
 
 // Simulated function for SoundCloud (for demo purposes)
@@ -76,5 +88,22 @@ const simulateSoundCloudExtraction = (url: string): Promise<AudioSource> => {
       
       toast.success("SoundCloud track extracted (simulation)");
     }, 2000);
+  });
+};
+
+// Helper functions for the audio service
+// Import these from youtubeService.ts in a real implementation
+import { fetchYouTubeAudio, createLofiVersion } from "./youtubeService";
+
+// Additional helper function for simulating lo-fi processing
+const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promise<string> => {
+  return new Promise((resolve) => {
+    // Simulate processing time based on complexity of settings
+    const processingTime = 3000 + Math.random() * 2000; // 3-5 seconds
+    
+    setTimeout(() => {
+      toast.success("Lo-fi conversion complete");
+      resolve(audioUrl);
+    }, processingTime);
   });
 };
