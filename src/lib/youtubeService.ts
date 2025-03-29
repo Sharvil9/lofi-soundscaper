@@ -36,10 +36,12 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
     
     // In development mode, use the fake audio service if not using real backend
     if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      console.log("Using simulated audio extraction");
       return simulateAudioExtraction(videoId, thumbnailUrl);
     }
     
     // Call the backend API to extract audio
+    console.log(`Calling backend API: ${BACKEND_API_URL}/extract`);
     const response = await fetch(`${BACKEND_API_URL}/extract`, {
       method: 'POST',
       headers: {
@@ -48,24 +50,85 @@ export const fetchYouTubeAudio = async (youtubeUrl: string): Promise<YouTubeApiR
       body: JSON.stringify({ youtubeUrl }),
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      toast.error(errorData.message || "Failed to extract audio");
-      throw new Error(errorData.message || "Failed to extract audio");
+    // Check for network errors
+    if (!response) {
+      console.error("Network error: No response received");
+      toast.error("Network error. Please check your connection.");
+      throw new Error("Network error");
     }
     
+    // Get the response even if it's an error, to see details
     const data = await response.json();
+    
+    if (!response.ok) {
+      console.error("API Error:", data);
+      toast.error(data.message || "Failed to extract audio");
+      throw new Error(data.message || "Failed to extract audio");
+    }
+    
+    console.log("Backend response:", data);
+    
+    // Verify we have all required fields
+    if (!data.title || !data.audioUrl) {
+      console.error("Invalid response from backend:", data);
+      toast.error("Invalid response from server");
+      throw new Error("Invalid response from server");
+    }
+    
     toast.success("Audio extracted successfully");
     
     return {
       title: data.title,
       audioUrl: data.audioUrl,
-      thumbnailUrl,
+      thumbnailUrl: data.thumbnailUrl || thumbnailUrl,
       originalFileId: data.originalFileId
     };
   } catch (error) {
     console.error("Error fetching YouTube audio:", error);
     toast.error("Failed to extract audio from YouTube");
+    throw error;
+  }
+};
+
+// Upload local audio file
+export const uploadAudioFile = async (file: File): Promise<YouTubeApiResponse> => {
+  try {
+    console.log("Uploading audio file:", file.name);
+    
+    // In development mode, use the fake audio service if not using real backend
+    if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      console.log("Using simulated file upload");
+      return simulateFileUpload(file);
+    }
+    
+    // Create form data
+    const formData = new FormData();
+    formData.append('audioFile', file);
+    
+    // Call the backend API to upload file
+    const response = await fetch(`${BACKEND_API_URL}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      toast.error(errorData.message || "Failed to upload audio file");
+      throw new Error(errorData.message || "Failed to upload audio file");
+    }
+    
+    const data = await response.json();
+    toast.success("File uploaded successfully");
+    
+    return {
+      title: data.title || file.name,
+      audioUrl: data.audioUrl,
+      thumbnailUrl: "/placeholder.svg",  // Default placeholder for uploaded files
+      originalFileId: data.originalFileId
+    };
+  } catch (error) {
+    console.error("Error uploading audio file:", error);
+    toast.error("Failed to upload audio file");
     throw error;
   }
 };
@@ -77,6 +140,7 @@ export const createLofiVersion = async (
 ): Promise<string> => {
   try {
     console.log("Creating lo-fi version with settings:", settings);
+    console.log("Audio URL:", audioUrl);
     
     // In development mode, use the fake processing service if not using real backend
     if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
@@ -96,13 +160,23 @@ export const createLofiVersion = async (
       }),
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      toast.error(errorData.message || "Failed to process audio");
-      throw new Error(errorData.message || "Failed to process audio");
+    // Check for network errors
+    if (!response) {
+      console.error("Network error: No response received");
+      toast.error("Network error. Please check your connection.");
+      throw new Error("Network error");
     }
     
+    // Get the response data
     const data = await response.json();
+    
+    if (!response.ok) {
+      console.error("API Error:", data);
+      toast.error(data.message || "Failed to process audio");
+      throw new Error(data.message || "Failed to process audio");
+    }
+    
+    console.log("Backend processing response:", data);
     
     // Check if original file was deleted
     if (data.originalDeleted) {
@@ -175,6 +249,26 @@ const simulateAudioExtraction = (videoId: string, thumbnailUrl: string): Promise
   });
 };
 
+// Simulate file upload (for dev/test)
+const simulateFileUpload = (file: File): Promise<YouTubeApiResponse> => {
+  return new Promise((resolve) => {
+    // Simulate API delay
+    setTimeout(() => {
+      // Create an object URL for the file (this will work in the browser)
+      const audioUrl = URL.createObjectURL(file);
+      
+      resolve({
+        title: file.name,
+        audioUrl,
+        thumbnailUrl: "/placeholder.svg", // placeholder image
+        originalFileId: `upload-${Date.now()}`
+      });
+      
+      toast.success("File uploaded successfully");
+    }, 1000);
+  });
+};
+
 const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promise<string> => {
   return new Promise((resolve) => {
     // Simulate processing time based on complexity of settings
@@ -182,6 +276,14 @@ const simulateLofiProcessing = (audioUrl: string, settings: LofiSettings): Promi
     
     setTimeout(() => {
       toast.success("Lo-fi conversion complete");
+      
+      // If we're using an Object URL (local file), just return it
+      if (audioUrl.startsWith('blob:')) {
+        console.log("Using original local file as lo-fi version");
+        resolve(audioUrl);
+        return;
+      }
+      
       // For development/demo, return a different sample to distinguish from original
       const lofiSamples = [
         "https://cdn.freesound.org/previews/632/632724_13435817-lq.mp3", // Lo-fi beat

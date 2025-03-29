@@ -2,12 +2,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
+import FileUpload from '@/components/FileUpload';
 import LofiControls, { LofiSettings } from '@/components/LofiControls';
 import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
 import ThumbnailDisplay from '@/components/ThumbnailDisplay';
 import FeatureBanner from '@/components/FeatureBanner';
-import { extractAudio, processToLofi, AudioSource } from '@/lib/audioService';
+import { extractAudio, processToLofi, AudioSource, handleFileUpload } from '@/lib/audioService';
 import { toast } from "sonner";
 
 const Index = () => {
@@ -16,6 +17,7 @@ const Index = () => {
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [lofiAudioUrl, setLofiAudioUrl] = useState<string | undefined>();
   const [isPlaying, setIsPlaying] = useState(false);
+  const [activeTab, setActiveTab] = useState<'link' | 'upload'>('link');
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
     tempo: 85,
@@ -49,6 +51,36 @@ const Index = () => {
     } catch (error) {
       console.error("Error processing media:", error);
       toast.error("Failed to process media link");
+    } finally {
+      setIsLoading(false);
+      setIsProcessing(false);
+    }
+  };
+  
+  const handleFileUpload = async (file: File) => {
+    setIsLoading(true);
+    setAudioSource(null);
+    setLofiAudioUrl(undefined);
+    setIsPlaying(false);
+    
+    try {
+      // Process the uploaded file
+      const source = await handleFileUpload(file);
+      setAudioSource(source);
+      
+      // Immediately process to lo-fi
+      setIsProcessing(true);
+      const lofiUrl = await processToLofi(source, lofiSettings, true);
+      setLofiAudioUrl(lofiUrl);
+      
+      // Auto-play the processed lo-fi version
+      setTimeout(() => {
+        setIsPlaying(true);
+      }, 500);
+      
+    } catch (error) {
+      console.error("Error processing uploaded file:", error);
+      toast.error("Failed to process audio file");
     } finally {
       setIsLoading(false);
       setIsProcessing(false);
@@ -115,10 +147,35 @@ const Index = () => {
           </div>
           
           <div className="space-y-6">
-            <YouTubeInput 
-              onSubmit={handleMediaSubmit}
-              isLoading={isLoading}
-            />
+            {/* Tab navigation for link/upload */}
+            <div className="flex justify-center mb-4">
+              <div className="flex rounded-lg bg-lofi-100 dark:bg-lofi-800 p-1 shadow-inner">
+                <button 
+                  onClick={() => setActiveTab('link')} 
+                  className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all`}
+                >
+                  YouTube Link
+                </button>
+                <button 
+                  onClick={() => setActiveTab('upload')} 
+                  className={`px-4 py-2 rounded-md ${activeTab === 'upload' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all`}
+                >
+                  Upload File
+                </button>
+              </div>
+            </div>
+            
+            {activeTab === 'link' ? (
+              <YouTubeInput 
+                onSubmit={handleMediaSubmit}
+                isLoading={isLoading}
+              />
+            ) : (
+              <FileUpload 
+                onUpload={handleFileUpload}
+                isLoading={isLoading}
+              />
+            )}
             
             {audioSource && (
               <>
@@ -164,8 +221,8 @@ const Index = () => {
               <h2 className="text-xl font-medium mb-2">How it works</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
                 <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Paste a YouTube link</div>
-                  <p className="text-sm">Enter any YouTube URL to extract the audio in high quality</p>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. {activeTab === 'link' ? 'Paste a YouTube link' : 'Upload an audio file'}</div>
+                  <p className="text-sm">{activeTab === 'link' ? 'Enter any YouTube URL to extract the audio in high quality' : 'Select an audio file from your computer to process'}</p>
                 </div>
                 <div>
                   <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>

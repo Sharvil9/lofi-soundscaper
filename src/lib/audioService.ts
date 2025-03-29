@@ -6,7 +6,7 @@ export interface AudioSource {
   title: string;
   audioUrl: string;
   thumbnailUrl: string;
-  platform: "youtube" | "soundcloud" | "other";
+  platform: "youtube" | "soundcloud" | "other" | "local";
   originalFileId?: string; // Track the original file ID for deletion
 }
 
@@ -21,11 +21,47 @@ export const detectPlatform = (url: string): "youtube" | "soundcloud" | "other" 
   }
 };
 
+// Handle file uploads
+export const handleFileUpload = async (file: File): Promise<AudioSource> => {
+  try {
+    // Check if the file is an audio file
+    if (!file.type.startsWith('audio/')) {
+      toast.error("Please upload an audio file");
+      throw new Error("Invalid file type");
+    }
+    
+    console.log(`Processing uploaded file: ${file.name} (${file.type})`);
+    
+    // Create a local URL for the file
+    const audioUrl = URL.createObjectURL(file);
+    
+    // For file uploads, use a default thumbnail or generate one
+    const thumbnailUrl = "/placeholder.svg";  // Using placeholder image
+    
+    // Return audio source object
+    const audioSource: AudioSource = {
+      title: file.name,
+      audioUrl,
+      thumbnailUrl,
+      platform: "local"
+    };
+    
+    toast.success(`Uploaded: ${file.name}`);
+    return audioSource;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    toast.error("Failed to upload file");
+    throw error;
+  }
+};
+
 // Extract audio from various platforms
 export const extractAudio = async (url: string): Promise<AudioSource> => {
   const platform = detectPlatform(url);
   
   try {
+    console.log(`Extracting audio from ${platform} URL: ${url}`);
+    
     switch (platform) {
       case "youtube":
         const ytResponse = await fetchYouTubeAudio(url);
@@ -60,8 +96,14 @@ export const processToLofi = async (
     // Log the processing attempt
     console.log(`Processing ${audioSource.platform} audio to lo-fi with settings:`, settings);
     
-    // For now, we're using the same processing function for all platforms
-    // In the future, this could be extended for platform-specific processing
+    // For local uploads, no need for backend processing if using simulated mode
+    if (audioSource.platform === "local" && import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      console.log("Processing local file in simulated mode");
+      const processedUrl = await simulateLofiProcessing(audioSource.audioUrl, settings);
+      return processedUrl;
+    }
+    
+    // For YouTube or other online sources
     if (audioSource.platform === "youtube") {
       // Make sure we're getting a proper URL back from the processing
       const processedUrl = await createLofiVersion(audioSource.audioUrl, settings, autoDelete);

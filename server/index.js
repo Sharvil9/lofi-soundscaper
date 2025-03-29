@@ -1,3 +1,4 @@
+
 const express = require('express');
 const cors = require('cors');
 const ytdl = require('youtube-dl-exec');
@@ -5,6 +6,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -29,6 +31,30 @@ app.use(cors());
 app.use(express.json());
 app.use('/processed', express.static(processedDir));
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: function(req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function(req, file, cb) {
+    const fileId = uuidv4();
+    const extension = path.extname(file.originalname);
+    cb(null, `${fileId}${extension}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
+  fileFilter: function(req, file, cb) {
+    // Only accept audio files
+    if (!file.mimetype.startsWith('audio/')) {
+      return cb(new Error('Only audio files are allowed'));
+    }
+    cb(null, true);
+  }
+});
+
 // Extract audio from YouTube URL
 app.post('/api/extract', async (req, res) => {
   try {
@@ -38,39 +64,88 @@ app.post('/api/extract', async (req, res) => {
       return res.status(400).json({ message: 'YouTube URL is required' });
     }
     
+    console.log(`Attempting to extract audio from: ${youtubeUrl}`);
+    
     // Generate a unique ID for this extraction
     const fileId = uuidv4();
     const outputPath = path.join(uploadsDir, `${fileId}.mp3`);
     
-    // Get video info
-    const videoInfo = await ytdl.exec(youtubeUrl, {
-      dumpSingleJson: true,
-      noCheckCertificates: true,
-      noWarnings: true,
-      preferFreeFormats: true,
-    });
-    
-    // Download audio only with highest quality
-    await ytdl.exec(youtubeUrl, {
-      extractAudio: true,
-      audioFormat: 'mp3',
-      audioQuality: 0, // best quality
-      output: outputPath,
-      noCheckCertificates: true,
-      noWarnings: true,
-    });
-    
-    // Return the audio URL and metadata
-    const audioUrl = `/uploads/${fileId}.mp3`;
-    
-    res.json({
-      title: videoInfo.title,
-      audioUrl: audioUrl,
-      originalFileId: fileId, // Track for cleanup later
-    });
+    // Get video info with detailed debugging
+    try {
+      console.log("Fetching video info...");
+      const videoInfo = await ytdl.exec(youtubeUrl, {
+        dumpSingleJson: true,
+        noCheckCertificates: true,
+        noWarnings: true,
+        preferFreeFormats: true,
+      });
+      console.log("Video info fetched successfully:", videoInfo.title);
+      
+      // Download audio only with highest quality
+      console.log("Starting audio extraction...");
+      await ytdl.exec(youtubeUrl, {
+        extractAudio: true,
+        audioFormat: 'mp3',
+        audioQuality: 0, // best quality
+        output: outputPath,
+        noCheckCertificates: true,
+        noWarnings: true,
+      });
+      
+      console.log(`Audio extracted successfully to: ${outputPath}`);
+      
+      // Verify the file was actually created
+      if (!fs.existsSync(outputPath)) {
+        console.error("File was not created at expected path!");
+        return res.status(500).json({ message: 'Failed to save extracted audio' });
+      }
+      
+      // Get file size for debugging
+      const stats = fs.statSync(outputPath);
+      console.log(`File size: ${stats.size / 1024 / 1024} MB`);
+      
+      // Return the audio URL and metadata
+      const audioUrl = `/uploads/${fileId}.mp3`;
+      
+      res.json({
+        title: videoInfo.title,
+        audioUrl: audioUrl,
+        originalFileId: fileId, // Track for cleanup later
+        thumbnailUrl: videoInfo.thumbnail,
+      });
+    } catch (err) {
+      console.error("YouTube extraction error details:", err);
+      return res.status(500).json({ 
+        message: 'Failed to extract audio', 
+        error: err.message,
+        stack: err.stack 
+      });
+    }
   } catch (error) {
     console.error('Error extracting audio:', error);
     res.status(500).json({ message: 'Failed to extract audio', error: error.message });
+  }
+});
+
+// Upload audio file endpoint
+app.post('/api/upload', upload.single('audioFile'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+    
+    const fileId = path.basename(req.file.filename, path.extname(req.file.filename));
+    const audioUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      message: 'File uploaded successfully',
+      title: req.file.originalname,
+      audioUrl: audioUrl,
+      originalFileId: fileId
+    });
+  } catch (error) {
+    console.error('Error handling file upload:', error);
+    res.status(500).json({ message: 'Failed to upload file', error: error.message });
   }
 });
 
@@ -84,13 +159,21 @@ app.post('/api/process', async (req, res) => {
     }
     
     // Extract file ID from URL
-    const fileIdMatch = audioUrl.match(/\/uploads\/(.+)\.mp3/);
+    const fileIdMatch = audioUrl.match(/\/uploads\/(.+)\.mp3/) || audioUrl.match(/\/uploads\/(.+)/);
     if (!fileIdMatch) {
       return res.status(400).json({ message: 'Invalid audio URL' });
     }
     
+    // Find the actual file (may have different extension)
     const fileId = fileIdMatch[1];
-    const inputPath = path.join(uploadsDir, `${fileId}.mp3`);
+    const uploadsContents = fs.readdirSync(uploadsDir);
+    const matchingFile = uploadsContents.find(filename => filename.startsWith(fileId));
+    
+    if (!matchingFile) {
+      return res.status(404).json({ message: 'Audio file not found' });
+    }
+    
+    const inputPath = path.join(uploadsDir, matchingFile);
     const outputId = uuidv4();
     const outputPath = path.join(processedDir, `${outputId}.mp3`);
     
@@ -99,6 +182,8 @@ app.post('/api/process', async (req, res) => {
       originalId: fileId,
       originalPath: inputPath
     });
+    
+    console.log(`Processing file: ${inputPath} with settings:`, settings);
     
     // Apply lo-fi effects using ffmpeg
     const command = ffmpeg(inputPath);
@@ -139,6 +224,12 @@ app.post('/api/process', async (req, res) => {
     // Execute the ffmpeg command
     command
       .output(outputPath)
+      .on('start', (commandLine) => {
+        console.log('FFmpeg command:', commandLine);
+      })
+      .on('progress', (progress) => {
+        console.log(`Processing: ${progress.percent ? progress.percent.toFixed(1) : 0}% done`);
+      })
       .on('end', () => {
         console.log('Processing finished');
         
@@ -207,4 +298,29 @@ app.use('/uploads', express.static(uploadsDir));
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+});
+
+// Debug endpoint to check downloaded files
+app.get('/api/debug/files', (req, res) => {
+  try {
+    const uploadFiles = fs.readdirSync(uploadsDir).map(file => ({
+      name: file,
+      path: path.join(uploadsDir, file),
+      size: fs.statSync(path.join(uploadsDir, file)).size,
+    }));
+    
+    const processedFiles = fs.readdirSync(processedDir).map(file => ({
+      name: file,
+      path: path.join(processedDir, file),
+      size: fs.statSync(path.join(processedDir, file)).size,
+    }));
+    
+    res.json({
+      uploads: uploadFiles,
+      processed: processedFiles,
+      mappings: Array.from(audioFilesMap.entries())
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
