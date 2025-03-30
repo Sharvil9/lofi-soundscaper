@@ -8,7 +8,7 @@ import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
 import ThumbnailDisplay from '@/components/ThumbnailDisplay';
 import FeatureBanner from '@/components/FeatureBanner';
-import { extractAudio, processToLofi, AudioSource, handleFileUpload } from '@/lib/audioService';
+import { extractAudio, processToLofi, AudioSource, handleFileUpload as processFileUpload } from '@/lib/audioService';
 import { toast } from "sonner";
 
 const Index = () => {
@@ -65,7 +65,7 @@ const Index = () => {
     
     try {
       // Process the uploaded file
-      const source = await handleFileUpload(file);
+      const source = await processFileUpload(file);
       setAudioSource(source);
       
       // Immediately process to lo-fi
