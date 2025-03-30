@@ -1,6 +1,7 @@
 
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
+import { uploadAudioFile } from "./youtubeService";
 
 export interface AudioSource {
   title: string;
@@ -32,22 +33,36 @@ export const handleFileUpload = async (file: File): Promise<AudioSource> => {
     
     console.log(`Processing uploaded file: ${file.name} (${file.type})`);
     
-    // Create a local URL for the file
-    const audioUrl = URL.createObjectURL(file);
-    
-    // For file uploads, use a default thumbnail or generate one
-    const thumbnailUrl = "/placeholder.svg";  // Using placeholder image
-    
-    // Return audio source object
-    const audioSource: AudioSource = {
-      title: file.name,
-      audioUrl,
-      thumbnailUrl,
-      platform: "local"
-    };
-    
-    toast.success(`Uploaded: ${file.name}`);
-    return audioSource;
+    // For development mode with simulated backend
+    if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {
+      // Create a local URL for the file
+      const audioUrl = URL.createObjectURL(file);
+      
+      // For file uploads, use a default thumbnail or generate one
+      const thumbnailUrl = "/placeholder.svg";  // Using placeholder image
+      
+      // Return audio source object
+      const audioSource: AudioSource = {
+        title: file.name,
+        audioUrl,
+        thumbnailUrl,
+        platform: "local"
+      };
+      
+      toast.success(`Uploaded: ${file.name}`);
+      return audioSource;
+    } else {
+      // Send file to backend API
+      const response = await uploadAudioFile(file);
+      
+      return {
+        title: response.title,
+        audioUrl: response.audioUrl,
+        thumbnailUrl: response.thumbnailUrl,
+        platform: "local",
+        originalFileId: response.originalFileId
+      };
+    }
   } catch (error) {
     console.error("Error uploading file:", error);
     toast.error("Failed to upload file");
@@ -103,25 +118,18 @@ export const processToLofi = async (
       return processedUrl;
     }
     
-    // For YouTube or other online sources
-    if (audioSource.platform === "youtube") {
-      // Make sure we're getting a proper URL back from the processing
-      const processedUrl = await createLofiVersion(audioSource.audioUrl, settings, autoDelete);
-      console.log("Processed audio URL:", processedUrl);
-      
-      // Ensure the URL is valid
-      if (!processedUrl || typeof processedUrl !== 'string') {
-        console.error("Invalid processed URL received:", processedUrl);
-        throw new Error("Invalid processed audio URL");
-      }
-      
-      return processedUrl;
-    } else {
-      // For other platforms, use a simpler approach for now
-      const processedUrl = await simulateLofiProcessing(audioSource.audioUrl, settings);
-      console.log("Processed audio URL (simulated):", processedUrl);
-      return processedUrl;
+    // For YouTube or other online sources, or local files with real backend
+    // Make sure we're getting a proper URL back from the processing
+    const processedUrl = await createLofiVersion(audioSource.audioUrl, settings, autoDelete);
+    console.log("Processed audio URL:", processedUrl);
+    
+    // Ensure the URL is valid
+    if (!processedUrl || typeof processedUrl !== 'string') {
+      console.error("Invalid processed URL received:", processedUrl);
+      throw new Error("Invalid processed audio URL");
     }
+    
+    return processedUrl;
   } catch (error) {
     console.error("Error processing to lo-fi:", error);
     throw error;
