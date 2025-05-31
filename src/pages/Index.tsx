@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -154,7 +153,7 @@ const Index = () => {
                   onClick={() => setActiveTab('link')} 
                   className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all`}
                 >
-                  YouTube Link
+                  Paste Link
                 </button>
                 <button 
                   onClick={() => setActiveTab('upload')} 

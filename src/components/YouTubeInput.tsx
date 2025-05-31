@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { YoutubeIcon, XIcon, SearchIcon, MusicIcon } from 'lucide-react';
+import { YoutubeIcon, XIcon, SearchIcon, MusicIcon, LinkIcon } from 'lucide-react';
 import { toast } from "sonner";
 import { detectPlatform } from '@/lib/audioService';
 
@@ -44,7 +44,7 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
 
   // Determine which platform icon to show
   const getPlatformIcon = () => {
-    if (!url.trim()) return <MusicIcon size={20} />;
+    if (!url.trim()) return <LinkIcon size={20} />;
     
     const platform = detectPlatform(url);
     switch (platform) {
@@ -53,7 +53,7 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
       case 'soundcloud':
         return <MusicIcon size={20} className="text-orange-400" />;
       default:
-        return <MusicIcon size={20} />;
+        return <LinkIcon size={20} />;
     }
   };
 
@@ -100,8 +100,8 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
               <span className="flex items-center justify-center w-5 h-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
             ) : (
               <>
-                <SearchIcon size={16} />
-                <span>Search</span>
+                <LinkIcon size={16} />
+                <span>Paste Link</span>
               </>
             )}
           </button>

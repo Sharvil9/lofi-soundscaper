@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
 import { uploadAudioFile } from "./youtubeService";
@@ -25,13 +24,29 @@ export const detectPlatform = (url: string): "youtube" | "soundcloud" | "other" 
 // Handle file uploads
 export const handleFileUpload = async (file: File): Promise<AudioSource> => {
   try {
-    // Check if the file is an audio file
-    if (!file.type.startsWith('audio/')) {
-      toast.error("Please upload an audio file");
+    // Enhanced audio file validation
+    const validTypes = [
+      'audio/mpeg',        // MP3
+      'audio/wav',         // WAV
+      'audio/aac',         // AAC
+      'audio/ogg',         // OGG/OPUS
+      'audio/opus',        // OPUS
+      'audio/x-m4a',       // M4A
+      'audio/mp4',         // M4A (alternative MIME type)
+      'audio/flac'         // FLAC
+    ];
+    
+    const validExtensions = ['.mp3', '.wav', '.aac', '.ogg', '.opus', '.m4a', '.flac'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    const isValidType = validTypes.includes(file.type) || validExtensions.includes(fileExtension);
+    
+    if (!isValidType) {
+      toast.error("Please upload a valid audio file (MP3, WAV, AAC, OGG, OPUS, M4A, FLAC)");
       throw new Error("Invalid file type");
     }
     
-    console.log(`Processing uploaded file: ${file.name} (${file.type})`);
+    console.log(`Processing uploaded file: ${file.name} (${file.type || 'type detected by extension'})`);
     
     // For development mode with simulated backend
     if (import.meta.env.DEV && !import.meta.env.VITE_USE_REAL_BACKEND) {

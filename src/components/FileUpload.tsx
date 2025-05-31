@@ -39,14 +39,32 @@ const FileUpload = ({ onUpload, isLoading }: FileUploadProps) => {
     }
   };
   
+  const isValidAudioFile = (file: File) => {
+    const validTypes = [
+      'audio/mpeg',        // MP3
+      'audio/wav',         // WAV
+      'audio/aac',         // AAC
+      'audio/ogg',         // OGG/OPUS
+      'audio/opus',        // OPUS
+      'audio/x-m4a',       // M4A
+      'audio/mp4',         // M4A (alternative MIME type)
+      'audio/flac'         // FLAC
+    ];
+    
+    const validExtensions = ['.mp3', '.wav', '.aac', '.ogg', '.opus', '.m4a', '.flac'];
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+    
+    return validTypes.includes(file.type) || validExtensions.includes(fileExtension);
+  };
+  
   const handleFiles = (files: FileList) => {
     if (files.length === 0) return;
     
     const file = files[0];
     
     // Check if the file is an audio file
-    if (!file.type.startsWith('audio/')) {
-      toast.error("Please upload an audio file");
+    if (!isValidAudioFile(file)) {
+      toast.error("Please upload a valid audio file (MP3, WAV, AAC, OGG, OPUS, M4A, FLAC)");
       return;
     }
     
@@ -70,7 +88,7 @@ const FileUpload = ({ onUpload, isLoading }: FileUploadProps) => {
           type="file" 
           id="file-upload" 
           className="hidden" 
-          accept="audio/*" 
+          accept="audio/*,.opus,.m4a" 
           onChange={handleFileChange} 
           disabled={isLoading}
         />
@@ -98,7 +116,7 @@ const FileUpload = ({ onUpload, isLoading }: FileUploadProps) => {
         </label>
         
         <div className="mt-4 text-xs text-center text-lofi-500 dark:text-lofi-400">
-          Supported formats: MP3, WAV, AAC, OGG, FLAC
+          Supported formats: MP3, WAV, AAC, OGG, OPUS, M4A, FLAC
         </div>
       </div>
     </div>

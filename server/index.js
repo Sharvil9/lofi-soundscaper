@@ -47,9 +47,25 @@ const upload = multer({
   storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit
   fileFilter: function(req, file, cb) {
-    // Only accept audio files
-    if (!file.mimetype.startsWith('audio/')) {
-      return cb(new Error('Only audio files are allowed'));
+    // Accept audio files including OPUS and M4A
+    const validMimeTypes = [
+      'audio/mpeg',        // MP3
+      'audio/wav',         // WAV
+      'audio/aac',         // AAC
+      'audio/ogg',         // OGG/OPUS
+      'audio/opus',        // OPUS
+      'audio/x-m4a',       // M4A
+      'audio/mp4',         // M4A (alternative MIME type)
+      'audio/flac'         // FLAC
+    ];
+    
+    const validExtensions = ['.mp3', '.wav', '.aac', '.ogg', '.opus', '.m4a', '.flac'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
+    
+    const isValidType = validMimeTypes.includes(file.mimetype) || validExtensions.includes(fileExtension);
+    
+    if (!isValidType) {
+      return cb(new Error('Only audio files are allowed (MP3, WAV, AAC, OGG, OPUS, M4A, FLAC)'));
     }
     cb(null, true);
   }
