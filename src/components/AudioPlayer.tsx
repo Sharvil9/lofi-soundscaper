@@ -1,6 +1,6 @@
-
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Play, Pause, Download, RefreshCw } from 'lucide-react';
+import { Play, Pause, Download, RefreshCw, equalizer } from 'lucide-react';
+import Equalizer from './Equalizer';
 
 interface AudioPlayerProps {
   originalAudioUrl?: string;
@@ -28,6 +28,7 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
   const [duration, setDuration] = useState(0);
   const [isPlayingOriginal, setIsPlayingOriginal] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [showEqualizer, setShowEqualizer] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
@@ -259,14 +260,25 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
               </button>
               
               {lofiAudioUrl && (
-                <button
-                  onClick={downloadLofi}
-                  className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-600 dark:bg-lofi-700 text-white hover:bg-lofi-700 dark:hover:bg-lofi-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isProcessing || audioLoading}
-                  aria-label="Download Lo-fi track"
-                >
-                  <Download size={16} />
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowEqualizer(true)}
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-purple-600 dark:bg-purple-700 text-white hover:bg-purple-700 dark:hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isProcessing || audioLoading}
+                    aria-label="Open Equalizer"
+                  >
+                    <equalizer size={16} />
+                  </button>
+                  
+                  <button
+                    onClick={downloadLofi}
+                    className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-600 dark:bg-lofi-700 text-white hover:bg-lofi-700 dark:hover:bg-lofi-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isProcessing || audioLoading}
+                    aria-label="Download Lo-fi track"
+                  >
+                    <Download size={16} />
+                  </button>
+                </>
               )}
               
               {isProcessing && (
@@ -304,6 +316,12 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
           </div>
         </div>
       </div>
+      
+      <Equalizer 
+        isOpen={showEqualizer}
+        onClose={() => setShowEqualizer(false)}
+        audioElement={audioRef.current}
+      />
     </div>
   );
 });

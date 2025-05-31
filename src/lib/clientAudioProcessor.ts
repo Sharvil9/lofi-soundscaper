@@ -1,4 +1,3 @@
-
 import { LofiSettings } from "@/components/LofiControls";
 import { toast } from "sonner";
 
@@ -30,76 +29,110 @@ export class ClientAudioProcessor {
     try {
       console.log("Processing audio with settings:", settings);
       
+      // Calculate tempo ratio from BPM (assuming original is around 120 BPM)
+      const tempoRatio = settings.bpm / 120;
+      
+      // Apply sample rate reduction if specified
+      let targetSampleRate = this.audioBuffer.sampleRate;
+      if (settings.sampleRateReduction > 0) {
+        targetSampleRate = Math.max(8000, this.audioBuffer.sampleRate * (1 - settings.sampleRateReduction / 100));
+      }
+      
       // Create offline audio context for processing
       const offlineContext = new OfflineAudioContext(
         this.audioBuffer.numberOfChannels,
-        Math.floor(this.audioBuffer.length * (settings.tempo / 100)),
-        this.audioBuffer.sampleRate
+        Math.floor(this.audioBuffer.length * tempoRatio),
+        targetSampleRate
       );
 
       // Create source
       const source = offlineContext.createBufferSource();
       source.buffer = this.audioBuffer;
 
-      // Apply tempo change (simplified)
-      source.playbackRate.value = settings.tempo / 100;
+      // Apply tempo change
+      source.playbackRate.value = tempoRatio;
 
       // Create effects chain
       let currentNode: AudioNode = source;
 
-      // Low-pass filter for that muffled lo-fi sound
+      // Pitch shift (detune)
+      if (settings.pitchShift !== 0) {
+        source.detune.value = settings.pitchShift * 100; // Convert semitones to cents
+      }
+
+      // Enhanced low-pass filter for that classic lo-fi sound
       const lowPassFilter = offlineContext.createBiquadFilter();
       lowPassFilter.type = 'lowpass';
-      lowPassFilter.frequency.value = 3000 - (settings.filter * 20); // Reduce frequency based on filter setting
+      // More aggressive filtering for lo-fi effect
+      lowPassFilter.frequency.value = Math.max(500, 8000 - (settings.filter * 60));
+      lowPassFilter.Q.value = 0.5 + (settings.filter / 200); // Slight resonance
       currentNode.connect(lowPassFilter);
       currentNode = lowPassFilter;
 
-      // High-pass filter to remove some low end
+      // High-pass filter to remove some low end mud
       const highPassFilter = offlineContext.createBiquadFilter();
       highPassFilter.type = 'highpass';
-      highPassFilter.frequency.value = 100 + (settings.filter * 2);
+      highPassFilter.frequency.value = 80 + (settings.filter * 2);
+      highPassFilter.Q.value = 0.7;
       currentNode.connect(highPassFilter);
       currentNode = highPassFilter;
 
-      // Reverb (convolution)
+      // Enhanced Reverb with proper wet/dry mix
       if (settings.reverb > 0) {
         const convolver = offlineContext.createConvolver();
         convolver.buffer = this.createReverbImpulse(offlineContext, settings.reverb / 100);
         
-        const dry = offlineContext.createGain();
-        dry.gain.value = 1 - (settings.reverb / 200);
+        const inputGain = offlineContext.createGain();
+        const dryGain = offlineContext.createGain();
+        const wetGain = offlineContext.createGain();
+        const outputGain = offlineContext.createGain();
         
-        const wet = offlineContext.createGain();
-        wet.gain.value = settings.reverb / 200;
+        // Proper wet/dry mixing
+        const wetAmount = settings.reverb / 100;
+        dryGain.gain.value = 1 - (wetAmount * 0.5);
+        wetGain.gain.value = wetAmount * 0.3;
         
-        currentNode.connect(dry);
-        currentNode.connect(convolver);
-        convolver.connect(wet);
+        currentNode.connect(inputGain);
+        inputGain.connect(dryGain);
+        inputGain.connect(convolver);
+        convolver.connect(wetGain);
         
-        const merger = offlineContext.createGain();
-        dry.connect(merger);
-        wet.connect(merger);
-        currentNode = merger;
+        dryGain.connect(outputGain);
+        wetGain.connect(outputGain);
+        currentNode = outputGain;
       }
 
-      // Bit crusher effect (simplified)
+      // Improved bit crusher effect (less harsh)
       if (settings.bitcrusher > 0) {
         const waveshaper = offlineContext.createWaveShaper();
-        waveshaper.curve = this.createBitCrushCurve(settings.bitcrusher);
+        waveshaper.curve = this.createSmoothBitCrushCurve(settings.bitcrusher);
+        waveshaper.oversample = '2x';
         currentNode.connect(waveshaper);
         currentNode = waveshaper;
       }
 
-      // Add some saturation/warmth
-      const saturation = offlineContext.createWaveShaper();
-      saturation.curve = this.createSaturationCurve();
-      saturation.oversample = '4x';
-      currentNode.connect(saturation);
-      currentNode = saturation;
+      // Saturation/Distortion for analog warmth
+      if (settings.saturation > 0) {
+        const saturationNode = offlineContext.createWaveShaper();
+        saturationNode.curve = this.createSaturationCurve(settings.saturation);
+        saturationNode.oversample = '4x';
+        currentNode.connect(saturationNode);
+        currentNode = saturationNode;
+      }
 
-      // Master gain
+      // Subtle compression for cohesion
+      const compressor = offlineContext.createDynamicsCompressor();
+      compressor.threshold.value = -12;
+      compressor.knee.value = 8;
+      compressor.ratio.value = 3;
+      compressor.attack.value = 0.01;
+      compressor.release.value = 0.1;
+      currentNode.connect(compressor);
+      currentNode = compressor;
+
+      // Master gain with subtle limiting
       const masterGain = offlineContext.createGain();
-      masterGain.gain.value = 0.8; // Slightly reduce volume
+      masterGain.gain.value = 0.85;
       currentNode.connect(masterGain);
       masterGain.connect(offlineContext.destination);
 
@@ -107,6 +140,11 @@ export class ClientAudioProcessor {
       source.start(0);
       
       const renderedBuffer = await offlineContext.startRendering();
+      
+      // Add vinyl noise if specified
+      if (settings.noise > 0) {
+        this.addVinylNoise(renderedBuffer, settings.noise);
+      }
       
       // Convert to WAV blob
       const wavBlob = this.audioBufferToWav(renderedBuffer);
@@ -122,43 +160,71 @@ export class ClientAudioProcessor {
   }
 
   private createReverbImpulse(context: OfflineAudioContext, reverbAmount: number): AudioBuffer {
-    const length = context.sampleRate * 2; // 2 seconds
+    const length = Math.floor(context.sampleRate * (1 + reverbAmount * 2)); // Variable length based on amount
     const impulse = context.createBuffer(2, length, context.sampleRate);
     
     for (let channel = 0; channel < 2; channel++) {
       const channelData = impulse.getChannelData(channel);
       for (let i = 0; i < length; i++) {
-        const decay = Math.pow(1 - (i / length), 2) * reverbAmount;
-        channelData[i] = (Math.random() * 2 - 1) * decay;
+        const decay = Math.pow(1 - (i / length), 1.5) * reverbAmount;
+        // Create more realistic room impulse
+        const early = Math.random() * 2 - 1;
+        const late = (Math.random() * 2 - 1) * 0.5;
+        channelData[i] = (early * Math.exp(-i / (context.sampleRate * 0.1)) + late) * decay;
       }
     }
     
     return impulse;
   }
 
-  private createBitCrushCurve(amount: number): Float32Array {
+  private createSmoothBitCrushCurve(amount: number): Float32Array {
     const samples = 44100;
     const curve = new Float32Array(samples);
-    const step = amount / 100;
+    const bitReduction = 1 + (amount / 100) * 6; // Reduced range for smoother effect
     
     for (let i = 0; i < samples; i++) {
       const x = (i * 2) / samples - 1;
-      curve[i] = Math.sign(x) * Math.pow(Math.abs(x), 1 + step);
+      const step = Math.pow(2, bitReduction);
+      const crushed = Math.round(x * step) / step;
+      // Soften the harsh edges
+      curve[i] = crushed * 0.8 + x * 0.2;
     }
     
     return curve;
   }
 
-  private createSaturationCurve(): Float32Array {
+  private createSaturationCurve(amount: number = 50): Float32Array {
     const samples = 44100;
     const curve = new Float32Array(samples);
+    const drive = 1 + (amount / 100) * 3;
     
     for (let i = 0; i < samples; i++) {
       const x = (i * 2) / samples - 1;
-      curve[i] = Math.tanh(x * 2) * 0.7;
+      // Tube-style saturation
+      const saturated = Math.tanh(x * drive) * (1 / Math.tanh(drive));
+      curve[i] = saturated * 0.9; // Prevent clipping
     }
     
     return curve;
+  }
+
+  private addVinylNoise(buffer: AudioBuffer, noiseAmount: number): void {
+    if (noiseAmount === 0) return;
+    
+    const noiseGain = (noiseAmount / 100) * 0.05; // Reduced noise level
+    
+    for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      for (let i = 0; i < channelData.length; i++) {
+        // Create vinyl-like crackle and pop
+        const crackle = (Math.random() * 2 - 1) * noiseGain * 0.3;
+        const pop = Math.random() < 0.0001 ? (Math.random() * 2 - 1) * noiseGain * 3 : 0;
+        channelData[i] += crackle + pop;
+        
+        // Prevent clipping
+        channelData[i] = Math.max(-1, Math.min(1, channelData[i]));
+      }
+    }
   }
 
   private audioBufferToWav(buffer: AudioBuffer): Blob {
