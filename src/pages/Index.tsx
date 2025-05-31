@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -7,7 +8,7 @@ import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
 import ThumbnailDisplay from '@/components/ThumbnailDisplay';
 import FeatureBanner from '@/components/FeatureBanner';
-import { extractAudio, processToLofi, AudioSource, handleFileUpload as processFileUpload } from '@/lib/audioService';
+import { processToLofi, AudioSource, handleFileUpload as processFileUpload, cleanupAudioProcessor } from '@/lib/audioService';
 import { toast } from "sonner";
 
 const Index = () => {
@@ -16,7 +17,7 @@ const Index = () => {
   const [audioSource, setAudioSource] = useState<AudioSource | null>(null);
   const [lofiAudioUrl, setLofiAudioUrl] = useState<string | undefined>();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'link' | 'upload'>('link');
+  const [activeTab, setActiveTab] = useState<'link' | 'upload'>('upload'); // Default to upload since links don't work
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
     tempo: 85,
@@ -27,33 +28,9 @@ const Index = () => {
   });
   
   const handleMediaSubmit = async (url: string) => {
-    setIsLoading(true);
-    setAudioSource(null);
-    setLofiAudioUrl(undefined);
-    setIsPlaying(false);
-    
-    try {
-      // Extract the audio from the URL
-      const source = await extractAudio(url);
-      setAudioSource(source);
-      
-      // Immediately process to lo-fi with auto-delete of original
-      setIsProcessing(true);
-      const lofiUrl = await processToLofi(source, lofiSettings, true);
-      setLofiAudioUrl(lofiUrl);
-      
-      // Auto-play the processed lo-fi version
-      setTimeout(() => {
-        setIsPlaying(true);
-      }, 500); // Small delay to ensure player is ready
-      
-    } catch (error) {
-      console.error("Error processing media:", error);
-      toast.error("Failed to process media link");
-    } finally {
-      setIsLoading(false);
-      setIsProcessing(false);
-    }
+    // This will always show the humorous error now
+    // The YouTubeInput component handles this
+    console.log("Link submission attempted (but not supported):", url);
   };
   
   const handleFileUpload = async (file: File) => {
@@ -67,22 +44,13 @@ const Index = () => {
       const source = await processFileUpload(file);
       setAudioSource(source);
       
-      // Immediately process to lo-fi
-      setIsProcessing(true);
-      const lofiUrl = await processToLofi(source, lofiSettings, true);
-      setLofiAudioUrl(lofiUrl);
-      
-      // Auto-play the processed lo-fi version
-      setTimeout(() => {
-        setIsPlaying(true);
-      }, 500);
+      toast.success("Audio file loaded! Adjust settings and click 'Process Audio' to create lo-fi version.");
       
     } catch (error) {
       console.error("Error processing uploaded file:", error);
-      toast.error("Failed to process audio file");
+      toast.error("Failed to load audio file");
     } finally {
       setIsLoading(false);
-      setIsProcessing(false);
     }
   };
   
@@ -91,22 +59,23 @@ const Index = () => {
   }, []);
   
   const applyLofiSettings = async () => {
-    if (!audioSource) return;
+    if (!audioSource) {
+      toast.error("Please upload an audio file first");
+      return;
+    }
     
     setIsProcessing(true);
     setLofiAudioUrl(undefined);
     setIsPlaying(false);
     
     try {
-      // Process with auto-delete of original
-      const lofiUrl = await processToLofi(audioSource, lofiSettings, true);
+      const lofiUrl = await processToLofi(audioSource, lofiSettings);
       setLofiAudioUrl(lofiUrl);
-      toast.success("Lo-fi settings applied");
       
       // Auto-play the newly processed lo-fi version
       setTimeout(() => {
         setIsPlaying(true);
-      }, 500); // Small delay to ensure player is ready
+      }, 500);
       
     } catch (error) {
       console.error("Error applying lo-fi settings:", error);
@@ -116,7 +85,14 @@ const Index = () => {
     }
   };
   
-  // This effect ensures autoplay works when lofiAudioUrl changes
+  // Cleanup audio processor on unmount
+  useEffect(() => {
+    return () => {
+      cleanupAudioProcessor();
+    };
+  }, []);
+  
+  // Handle auto-play
   useEffect(() => {
     if (lofiAudioUrl && isPlaying && audioPlayerRef.current) {
       console.log("Auto-playing lo-fi version");
@@ -140,8 +116,8 @@ const Index = () => {
           <div className="mb-12 text-center animate-fade-in-up">
             <h1 className="text-4xl font-bold mb-3">Lofi Soundscaper</h1>
             <p className="text-lofi-600 dark:text-lofi-300 max-w-2xl mx-auto">
-              Transform your favorite songs into relaxing lo-fi versions.
-              Adjust the tempo, add vinyl crackle, apply filters, and create the perfect ambient sound.
+              Transform your audio files into relaxing lo-fi versions.
+              Upload your music, adjust the settings, and create the perfect ambient sound.
             </p>
           </div>
           
@@ -151,15 +127,17 @@ const Index = () => {
               <div className="flex rounded-lg bg-lofi-100 dark:bg-lofi-800 p-1 shadow-inner">
                 <button 
                   onClick={() => setActiveTab('link')} 
-                  className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all`}
+                  className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
                 >
                   Paste Link
+                  <span className="absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1">😅</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('upload')} 
-                  className={`px-4 py-2 rounded-md ${activeTab === 'upload' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all`}
+                  className={`px-4 py-2 rounded-md ${activeTab === 'upload' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
                 >
                   Upload File
+                  <span className="absolute -top-1 -right-1 text-xs bg-green-500 text-white rounded-full px-1">✓</span>
                 </button>
               </div>
             </div>
@@ -220,8 +198,8 @@ const Index = () => {
               <h2 className="text-xl font-medium mb-2">How it works</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
                 <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. {activeTab === 'link' ? 'Paste a YouTube link' : 'Upload an audio file'}</div>
-                  <p className="text-sm">{activeTab === 'link' ? 'Enter any YouTube URL to extract the audio in high quality' : 'Select an audio file from your computer to process'}</p>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
+                  <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
                 </div>
                 <div>
                   <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
@@ -229,15 +207,21 @@ const Index = () => {
                 </div>
                 <div>
                   <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
-                  <p className="text-sm">Save the lo-fi version to your device and enjoy anytime</p>
+                  <p className="text-sm">Process and save the lo-fi version to your device</p>
                 </div>
+              </div>
+              
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
+                </p>
               </div>
             </div>
           )}
         </main>
         
         <footer className="mt-16 text-center text-sm text-lofi-500 dark:text-lofi-400">
-          <p>Created with ♥ for lo-fi music enthusiasts</p>
+          <p>Created with ♥ for lo-fi music enthusiasts • Fully client-side processing</p>
         </footer>
       </div>
     </div>

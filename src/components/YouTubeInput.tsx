@@ -1,8 +1,7 @@
 
 import { useState } from 'react';
-import { YoutubeIcon, XIcon, SearchIcon, MusicIcon, LinkIcon } from 'lucide-react';
+import { YoutubeIcon, XIcon, SearchIcon, MusicIcon, LinkIcon, AlertTriangle } from 'lucide-react';
 import { toast } from "sonner";
-import { detectPlatform } from '@/lib/audioService';
 
 interface YouTubeInputProps {
   onSubmit: (url: string) => void;
@@ -11,16 +10,7 @@ interface YouTubeInputProps {
 
 const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
   const [url, setUrl] = useState('');
-  
-  const isValidMediaUrl = (url: string) => {
-    // YouTube URL validation
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})(&.*)?$/;
-    
-    // SoundCloud URL validation (basic pattern)
-    const soundcloudRegex = /^(https?:\/\/)?(www\.)?soundcloud\.com\/[\w-]+\/[\w-]+/;
-    
-    return youtubeRegex.test(url) || soundcloudRegex.test(url);
-  };
+  const [showHumorousError, setShowHumorousError] = useState(false);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,52 +20,48 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
       return;
     }
     
-    if (!isValidMediaUrl(url)) {
-      toast.error("Please enter a valid YouTube or SoundCloud URL");
-      return;
-    }
+    // Show humorous error for any URL attempt
+    setShowHumorousError(true);
+    setTimeout(() => setShowHumorousError(false), 5000);
     
-    onSubmit(url);
+    const humorousMessages = [
+      "🤖 Sorry, our AI hamsters are on strike and refuse to download from YouTube!",
+      "💸 YouTube wants us to pay $99999/month for their API. We spent it on coffee instead.",
+      "🚫 The internet police told us 'No more free music downloads!' We're law-abiding citizens.",
+      "🎭 Plot twist: We're actually a file upload service in disguise!",
+      "🐛 Our download feature went to buy cigarettes and never came back.",
+      "🎪 This feature is as real as unicorns and my social life.",
+      "💻 Error 418: I'm a teapot, not a YouTube downloader!"
+    ];
+    
+    const randomMessage = humorousMessages[Math.floor(Math.random() * humorousMessages.length)];
+    toast.error(randomMessage, { duration: 8000 });
   };
   
   const clearInput = () => {
     setUrl('');
-  };
-
-  // Determine which platform icon to show
-  const getPlatformIcon = () => {
-    if (!url.trim()) return <LinkIcon size={20} />;
-    
-    const platform = detectPlatform(url);
-    switch (platform) {
-      case 'youtube':
-        return <YoutubeIcon size={20} />;
-      case 'soundcloud':
-        return <MusicIcon size={20} className="text-orange-400" />;
-      default:
-        return <LinkIcon size={20} />;
-    }
+    setShowHumorousError(false);
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto animate-fade-in-up">
       <div className="mb-3 text-center">
         <p className="text-sm uppercase tracking-widest text-lofi-500 dark:text-lofi-400">
-          Start by pasting a YouTube or SoundCloud link
+          Paste a link (but it won't work, just for show 😉)
         </p>
       </div>
       
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative group">
           <div className="absolute left-4 top-1/2 -translate-y-1/2 text-lofi-400">
-            {getPlatformIcon()}
+            <LinkIcon size={20} />
           </div>
           
           <input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://youtube.com/watch?v=... or https://soundcloud.com/..."
+            placeholder="https://youtube.com/watch?v=... (this won't work but try anyway!)"
             className="w-full h-14 pl-12 pr-24 rounded-xl border border-lofi-200 dark:border-lofi-700 bg-white dark:bg-lofi-900 focus:border-accent focus:ring-2 focus:ring-accent/20 shadow-sm transition-all duration-300 text-lofi-800 dark:text-lofi-100"
             disabled={isLoading}
           />
@@ -101,16 +87,28 @@ const YouTubeInput = ({ onSubmit, isLoading }: YouTubeInputProps) => {
             ) : (
               <>
                 <LinkIcon size={16} />
-                <span>Paste Link</span>
+                <span>Try Anyway</span>
               </>
             )}
           </button>
         </div>
       </form>
       
+      {showHumorousError && (
+        <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg animate-fade-in-up">
+          <div className="flex items-center space-x-2 text-red-700 dark:text-red-300">
+            <AlertTriangle size={20} />
+            <p className="font-medium">Feature Unavailable (As Expected!)</p>
+          </div>
+          <p className="text-sm text-red-600 dark:text-red-400 mt-1">
+            This is a demo limitation. Please use the file upload feature instead - it actually works! 🎵
+          </p>
+        </div>
+      )}
+      
       <div className="mt-3 text-center">
         <p className="text-xs text-lofi-500 dark:text-lofi-400">
-          We'll download the audio and prepare it for lofi conversion
+          Pro tip: Upload your own audio files instead! That actually works. 🎧
         </p>
       </div>
     </div>

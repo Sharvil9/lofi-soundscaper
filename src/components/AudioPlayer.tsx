@@ -13,7 +13,6 @@ interface AudioPlayerProps {
   autoPlayLofi?: boolean;
 }
 
-// Create a type that allows ref forwarding
 const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({ 
   originalAudioUrl, 
   lofiAudioUrl, 
@@ -28,125 +27,112 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlayingOriginal, setIsPlayingOriginal] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Forward the audio element ref to the parent component
   useImperativeHandle(ref, () => audioRef.current);
   
-  // Sync external isPlaying state with internal state
-  useEffect(() => {
-    if (externalIsPlaying !== undefined) {
-      setIsPlaying(externalIsPlaying);
-      
-      // If we're told to play and we have an audio element, play it
-      if (externalIsPlaying && audioRef.current) {
-        const playPromise = audioRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.error("Error playing audio from external state change:", error);
-            setIsPlaying(false);
-            onTogglePlay(false);
-          });
-        }
-      } else if (!externalIsPlaying && audioRef.current) {
-        audioRef.current.pause();
-      }
+  // Debounce play/pause to prevent conflicts
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const debouncedTogglePlay = (shouldPlay: boolean) => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
-  }, [externalIsPlaying, onTogglePlay]);
+    
+    debounceTimeoutRef.current = setTimeout(() => {
+      if (shouldPlay !== isPlaying) {
+        setIsPlaying(shouldPlay);
+        onTogglePlay(shouldPlay);
+      }
+    }, 100);
+  };
+  
+  // Handle external play state changes
+  useEffect(() => {
+    if (externalIsPlaying !== undefined && externalIsPlaying !== isPlaying) {
+      setIsPlaying(externalIsPlaying);
+    }
+  }, [externalIsPlaying]);
   
   // Handle auto-play of lofi version when it becomes available
   useEffect(() => {
-    if (autoPlayLofi && lofiAudioUrl && !isPlayingOriginal) {
-      // Auto switch to lo-fi version when it's available
+    if (autoPlayLofi && lofiAudioUrl && !isPlayingOriginal && !isProcessing) {
       setIsPlayingOriginal(false);
-      
-      if (audioRef.current) {
-        // Load the new audio
-        audioRef.current.src = lofiAudioUrl;
-        audioRef.current.load();
-        
-        // Play it automatically
-        console.log("Auto-playing lo-fi audio");
-        const playPromise = audioRef.current.play();
-        
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => {
-              setIsPlaying(true);
-              onTogglePlay(true);
-            })
-            .catch(error => {
-              console.error("Error auto-playing lo-fi audio:", error);
-            });
-        }
-      }
+      setTimeout(() => {
+        debouncedTogglePlay(true);
+      }, 500);
     }
-  }, [lofiAudioUrl, autoPlayLofi, isPlayingOriginal, onTogglePlay]);
+  }, [lofiAudioUrl, autoPlayLofi, isPlayingOriginal, isProcessing]);
   
+  // Audio event handlers
   useEffect(() => {
     if (!audioRef.current) return;
     
-    const handleTimeUpdate = () => {
-      if (audioRef.current) {
-        setCurrentTime(audioRef.current.currentTime);
-      }
-    };
+    const audio = audioRef.current;
     
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
     const handleLoadedMetadata = () => {
-      if (audioRef.current) {
-        setDuration(audioRef.current.duration);
-      }
+      setDuration(audio.duration);
+      setAudioLoading(false);
     };
-    
+    const handleLoadStart = () => setAudioLoading(true);
+    const handleCanPlay = () => setAudioLoading(false);
     const handleEnded = () => {
       setIsPlaying(false);
       onTogglePlay(false);
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        setCurrentTime(0);
-      }
+      setCurrentTime(0);
+    };
+    const handleError = () => {
+      setAudioLoading(false);
+      setIsPlaying(false);
+      onTogglePlay(false);
+      console.error("Audio playback error");
     };
     
-    audioRef.current.addEventListener('timeupdate', handleTimeUpdate);
-    audioRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audioRef.current.addEventListener('ended', handleEnded);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('loadstart', handleLoadStart);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
     
     return () => {
-      if (audioRef.current) {
-        audioRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-        audioRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        audioRef.current.removeEventListener('ended', handleEnded);
-      }
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('loadstart', handleLoadStart);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError);
     };
   }, [onTogglePlay]);
   
-  // This effect watches for changes in the audio URLs or playback mode
+  // Handle audio source changes
   useEffect(() => {
     if (!audioRef.current) return;
     
-    // Get the appropriate URL based on which version we're playing
     const currentUrl = isPlayingOriginal ? originalAudioUrl : lofiAudioUrl;
     
-    // Only update if we have a valid URL
-    if (currentUrl) {
+    if (currentUrl && audioRef.current.src !== currentUrl) {
       console.log(`Loading ${isPlayingOriginal ? 'original' : 'lo-fi'} audio:`, currentUrl);
-      audioRef.current.src = currentUrl;
       
-      // Reset state when changing audio source
+      setAudioLoading(true);
       setCurrentTime(0);
       
-      // If it was playing before switching, load and start playing again
+      audioRef.current.src = currentUrl;
+      audioRef.current.load();
+      
+      // Play if we should be playing
       if (isPlaying) {
-        audioRef.current.load(); // Force reload of the audio
         const playPromise = audioRef.current.play();
-        
-        // Handle play promise to avoid uncaught promise errors
         if (playPromise !== undefined) {
           playPromise.catch(error => {
             console.error("Error playing audio:", error);
             setIsPlaying(false);
             onTogglePlay(false);
+            setAudioLoading(false);
           });
         }
       }
@@ -154,24 +140,19 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
   }, [isPlayingOriginal, originalAudioUrl, lofiAudioUrl, isPlaying, onTogglePlay]);
   
   const togglePlay = () => {
-    if (!audioRef.current) return;
+    if (!audioRef.current || audioLoading) return;
     
     if (isPlaying) {
       audioRef.current.pause();
-      setIsPlaying(false);
-      onTogglePlay(false);
+      debouncedTogglePlay(false);
     } else {
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise
-          .then(() => {
-            setIsPlaying(true);
-            onTogglePlay(true);
-          })
+          .then(() => debouncedTogglePlay(true))
           .catch(error => {
             console.error("Error playing audio:", error);
-            setIsPlaying(false);
-            onTogglePlay(false);
+            debouncedTogglePlay(false);
           });
       }
     }
@@ -186,6 +167,7 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
   };
   
   const formatTime = (seconds: number) => {
+    if (!isFinite(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -196,15 +178,24 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
     
     const a = document.createElement('a');
     a.href = lofiAudioUrl;
-    a.download = `${songTitle || 'track'}_lofi.mp3`;
+    a.download = `${songTitle || 'track'}_lofi.wav`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   };
   
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+  
   return (
     <div className="w-full glass-panel p-6 animate-fade-in-up delay-400">
-      <audio ref={audioRef} />
+      <audio ref={audioRef} preload="metadata" />
       
       <div className="flex flex-col md:flex-row gap-6">
         {/* Thumbnail display */}
@@ -212,7 +203,7 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
           <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden shrink-0">
             <img 
               src={thumbnailUrl} 
-              alt={songTitle || "YouTube thumbnail"} 
+              alt={songTitle || "Audio thumbnail"} 
               className="w-full h-full object-cover"
             />
           </div>
@@ -233,7 +224,7 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
                       ? 'bg-accent text-white' 
                       : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
                   }`}
-                  disabled={!originalAudioUrl || isProcessing}
+                  disabled={!originalAudioUrl || isProcessing || audioLoading}
                 >
                   Original
                 </button>
@@ -244,9 +235,9 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
                       ? 'bg-accent text-white' 
                       : 'bg-lofi-200 dark:bg-lofi-800 text-lofi-700 dark:text-lofi-300 hover:bg-lofi-300 dark:hover:bg-lofi-700'
                   }`}
-                  disabled={!lofiAudioUrl || isProcessing}
+                  disabled={!lofiAudioUrl || isProcessing || audioLoading}
                 >
-                  Lo-fi
+                  Lo-fi {lofiAudioUrl ? '✓' : ''}
                 </button>
               </div>
             </div>
@@ -255,17 +246,23 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
               <button
                 onClick={togglePlay}
                 className="w-14 h-14 rounded-full flex items-center justify-center bg-accent text-white hover:bg-accent-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow"
-                disabled={(isPlayingOriginal ? !originalAudioUrl : !lofiAudioUrl) || isProcessing}
+                disabled={(isPlayingOriginal ? !originalAudioUrl : !lofiAudioUrl) || isProcessing || audioLoading}
                 aria-label={isPlaying ? "Pause" : "Play"}
               >
-                {isPlaying ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+                {audioLoading ? (
+                  <RefreshCw size={20} className="animate-spin" />
+                ) : isPlaying ? (
+                  <Pause size={24} />
+                ) : (
+                  <Play size={24} className="ml-1" />
+                )}
               </button>
               
               {lofiAudioUrl && (
                 <button
                   onClick={downloadLofi}
                   className="w-10 h-10 rounded-full flex items-center justify-center bg-lofi-600 dark:bg-lofi-700 text-white hover:bg-lofi-700 dark:hover:bg-lofi-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isProcessing}
+                  disabled={isProcessing || audioLoading}
                   aria-label="Download Lo-fi track"
                 >
                   <Download size={16} />
@@ -292,11 +289,11 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
                   max={duration || 0}
                   value={currentTime}
                   onChange={seek}
-                  disabled={!originalAudioUrl || isProcessing}
+                  disabled={!originalAudioUrl || isProcessing || audioLoading}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div 
-                  className="absolute top-0 left-0 h-full bg-accent"
+                  className="absolute top-0 left-0 h-full bg-accent transition-all duration-200"
                   style={{ width: `${(currentTime / (duration || 1)) * 100}%` }}
                 />
               </div>
@@ -311,7 +308,6 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
   );
 });
 
-// Add a display name for debugging purposes
 AudioPlayer.displayName = "AudioPlayer";
 
 export default AudioPlayer;
