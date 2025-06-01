@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Play, Pause, Download, RefreshCw, equalizer } from 'lucide-react';
+import { Play, Pause, Download, RefreshCw, Sliders } from 'lucide-react';
 import Equalizer from './Equalizer';
 
 interface AudioPlayerProps {
@@ -267,7 +267,7 @@ const AudioPlayer = forwardRef<HTMLAudioElement | null, AudioPlayerProps>(({
                     disabled={isProcessing || audioLoading}
                     aria-label="Open Equalizer"
                   >
-                    <equalizer size={16} />
+                    <Sliders size={16} />
                   </button>
                   
                   <button

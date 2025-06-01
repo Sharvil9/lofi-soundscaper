@@ -20,11 +20,14 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<'link' | 'upload'>('upload'); // Default to upload since links don't work
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [lofiSettings, setLofiSettings] = useState<LofiSettings>({
-    tempo: 85,
+    bpm: 85,
     reverb: 30,
     filter: 40,
     noise: 15,
     bitcrusher: 10,
+    pitchShift: 0,
+    sampleRateReduction: 20,
+    saturation: 25,
   });
   
   const handleMediaSubmit = async (url: string) => {
