@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Volume2, Clock, Filter, BarChart2, Music, Wand2, Play, Waves } from 'lucide-react';
+import { Volume2, Clock, Filter, Music, Wand2, Play, Waves, Save, Undo, Redo, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
+import PresetManager from './PresetManager';
+import { usePresetManager } from '@/hooks/usePresetManager';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 export interface LofiSettings {
   bpm: number;           
   reverb: number;
   filter: number;
-  noise: number;         // Will be removed from processing but kept for UI consistency
+  noise: number;         
   bitcrusher: number;
   pitchShift: number;
 }
@@ -16,81 +19,118 @@ interface LofiControlsProps {
   onChange: (settings: LofiSettings) => void;
   isProcessing: boolean;
   onProcess: () => void;
+  onPreviewToggle?: (enabled: boolean) => void;
+  isPreviewEnabled?: boolean;
 }
 
-const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) => {
+const LofiControls = ({ onChange, isProcessing, onProcess, onPreviewToggle, isPreviewEnabled = false }: LofiControlsProps) => {
   const [settings, setSettings] = useState<LofiSettings>({
     bpm: 85,
     reverb: 30,
     filter: 40,
-    noise: 0,             // Set to 0 by default since we're removing vinyl noise
-    bitcrusher: 25,       // Better default for lo-fi effect
-    pitchShift: -1,       // Slight pitch down for lo-fi feel
+    noise: 0,             
+    bitcrusher: 25,       
+    pitchShift: -1,       
   });
+  
+  const [showPresetManager, setShowPresetManager] = useState(false);
+  const { loadPreset } = usePresetManager();
+  const { pushToHistory, undo, redo, canUndo, canRedo } = useUndoRedo(settings);
   
   useEffect(() => {
     onChange(settings);
   }, [settings, onChange]);
 
   const handleChange = (property: keyof LofiSettings, value: number) => {
-    setSettings(prev => ({
-      ...prev,
+    const newSettings = {
+      ...settings,
       [property]: value
-    }));
+    };
+    setSettings(newSettings);
+    pushToHistory(newSettings);
   };
   
   const applyPreset = (preset: string) => {
-    switch(preset) {
-      case 'chill':
-        setSettings({
-          bpm: 85,
-          reverb: 35,
-          filter: 45,
-          noise: 0,
-          bitcrusher: 30,
-          pitchShift: -1,
-        });
-        break;
-      case 'study':
-        setSettings({
-          bpm: 80,
-          reverb: 45,
-          filter: 55,
-          noise: 0,
-          bitcrusher: 40,
-          pitchShift: -1.5,
-        });
-        break;
-      case 'sleep':
-        setSettings({
-          bpm: 70,
-          reverb: 60,
-          filter: 70,
-          noise: 0,
-          bitcrusher: 20,
-          pitchShift: -2,
-        });
-        break;
-      case 'deep':
-        setSettings({
-          bpm: 75,
-          reverb: 50,
-          filter: 65,
-          noise: 0,
-          bitcrusher: 60,
-          pitchShift: -1.5,
-        });
-        break;
-      default:
-        break;
+    const presetSettings = loadPreset(preset);
+    if (presetSettings) {
+      setSettings(presetSettings);
+      pushToHistory(presetSettings);
     }
+  };
+
+  const handleUndo = () => {
+    const previousSettings = undo();
+    if (previousSettings) {
+      setSettings(previousSettings);
+    }
+  };
+
+  const handleRedo = () => {
+    const nextSettings = redo();
+    if (nextSettings) {
+      setSettings(nextSettings);
+    }
+  };
+
+  const handlePresetLoad = (newSettings: LofiSettings) => {
+    setSettings(newSettings);
+    pushToHistory(newSettings);
   };
 
   return (
     <div className="w-full p-6 glass-panel animate-fade-in-up delay-200">
       <div className="flex flex-col gap-8">
+        {/* Header with controls */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Lo-fi Controls</h3>
+          <div className="flex items-center gap-2">
+            {/* Undo/Redo */}
+            <Button
+              onClick={handleUndo}
+              disabled={!canUndo || isProcessing}
+              variant="outline"
+              size="sm"
+              className="p-2"
+            >
+              <Undo size={16} />
+            </Button>
+            <Button
+              onClick={handleRedo}
+              disabled={!canRedo || isProcessing}
+              variant="outline"
+              size="sm"
+              className="p-2"
+            >
+              <Redo size={16} />
+            </Button>
+            
+            {/* Real-time Preview Toggle */}
+            {onPreviewToggle && (
+              <Button
+                onClick={() => onPreviewToggle(!isPreviewEnabled)}
+                variant={isPreviewEnabled ? "default" : "outline"}
+                size="sm"
+                disabled={isProcessing}
+              >
+                {isPreviewEnabled ? "Preview On" : "Preview Off"}
+              </Button>
+            )}
+            
+            {/* Preset Manager */}
+            <Button
+              onClick={() => setShowPresetManager(true)}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Settings size={16} />
+              Presets
+            </Button>
+          </div>
+        </div>
+
         <div className="w-full">
-          <h3 className="text-lg font-medium mb-4 text-center">Presets</h3>
+          <h4 className="text-md font-medium mb-4 text-center">Quick Presets</h4>
           <Carousel className="max-w-md mx-auto">
             <CarouselContent>
               {['chill', 'study', 'sleep', 'deep'].map(preset => (
@@ -184,6 +224,13 @@ const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) 
           </Button>
         </div>
       </div>
+      
+      <PresetManager
+        currentSettings={settings}
+        onLoadPreset={handlePresetLoad}
+        isOpen={showPresetManager}
+        onClose={() => setShowPresetManager(false)}
+      />
     </div>
   );
 };
