@@ -1,18 +1,15 @@
-
 import { useState, useEffect } from 'react';
-import { Volume2, Clock, Filter, BarChart2, Music, Wand2, Play, Zap, Radio, Waves } from 'lucide-react';
+import { Volume2, Clock, Filter, BarChart2, Music, Wand2, Play, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 
 export interface LofiSettings {
-  bpm: number;           // Changed from tempo to BPM
+  bpm: number;           
   reverb: number;
   filter: number;
-  noise: number;
+  noise: number;         // Will be removed from processing but kept for UI consistency
   bitcrusher: number;
-  pitchShift: number;    // New: -12 to +12 semitones
-  sampleRateReduction: number; // New: 0-100 percentage
-  saturation: number;    // New: 0-100 percentage
+  pitchShift: number;
 }
 
 interface LofiControlsProps {
@@ -23,14 +20,12 @@ interface LofiControlsProps {
 
 const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) => {
   const [settings, setSettings] = useState<LofiSettings>({
-    bpm: 85,              // Changed from tempo percentage to BPM
+    bpm: 85,
     reverb: 30,
     filter: 40,
-    noise: 15,
-    bitcrusher: 10,
-    pitchShift: 0,        // New: neutral pitch
-    sampleRateReduction: 20, // New: slight sample rate reduction
-    saturation: 25,       // New: subtle saturation
+    noise: 0,             // Set to 0 by default since we're removing vinyl noise
+    bitcrusher: 25,       // Better default for lo-fi effect
+    pitchShift: -1,       // Slight pitch down for lo-fi feel
   });
   
   useEffect(() => {
@@ -49,25 +44,21 @@ const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) 
       case 'chill':
         setSettings({
           bpm: 85,
-          reverb: 30,
-          filter: 40,
-          noise: 15,
-          bitcrusher: 10,
+          reverb: 35,
+          filter: 45,
+          noise: 0,
+          bitcrusher: 30,
           pitchShift: -1,
-          sampleRateReduction: 20,
-          saturation: 25
         });
         break;
       case 'study':
         setSettings({
           bpm: 80,
-          reverb: 40,
-          filter: 50,
-          noise: 20,
-          bitcrusher: 15,
-          pitchShift: -2,
-          sampleRateReduction: 30,
-          saturation: 30
+          reverb: 45,
+          filter: 55,
+          noise: 0,
+          bitcrusher: 40,
+          pitchShift: -1.5,
         });
         break;
       case 'sleep':
@@ -75,23 +66,19 @@ const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) 
           bpm: 70,
           reverb: 60,
           filter: 70,
-          noise: 10,
-          bitcrusher: 5,
-          pitchShift: -3,
-          sampleRateReduction: 40,
-          saturation: 20
+          noise: 0,
+          bitcrusher: 20,
+          pitchShift: -2,
         });
         break;
       case 'deep':
         setSettings({
           bpm: 75,
           reverb: 50,
-          filter: 60,
-          noise: 25,
-          bitcrusher: 20,
+          filter: 65,
+          noise: 0,
+          bitcrusher: 60,
           pitchShift: -1.5,
-          sampleRateReduction: 35,
-          saturation: 40
         });
         break;
       default:
@@ -124,106 +111,66 @@ const LofiControls = ({ onChange, isProcessing, onProcess }: LofiControlsProps) 
           </Carousel>
         </div>
         
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <ControlSlider
-              label="BPM"
-              value={settings.bpm}
-              onChange={value => handleChange('bpm', value)}
-              min={60}
-              max={120}
-              icon={<Clock size={18} />}
-              suffix=" BPM"
-              hint="Beats per minute"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Reverb"
-              value={settings.reverb}
-              onChange={value => handleChange('reverb', value)}
-              min={0}
-              max={100}
-              icon={<Volume2 size={18} />}
-              suffix="%"
-              hint="Room ambience"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Filter"
-              value={settings.filter}
-              onChange={value => handleChange('filter', value)}
-              min={0}
-              max={100}
-              icon={<Filter size={18} />}
-              suffix="%"
-              hint="Lo-pass filter"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Noise"
-              value={settings.noise}
-              onChange={value => handleChange('noise', value)}
-              min={0}
-              max={100}
-              icon={<BarChart2 size={18} />}
-              suffix="%"
-              hint="Vinyl crackle"
-              disabled={isProcessing}
-            />
-          </div>
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ControlSlider
+            label="BPM"
+            value={settings.bpm}
+            onChange={value => handleChange('bpm', value)}
+            min={60}
+            max={120}
+            icon={<Clock size={18} />}
+            suffix=" BPM"
+            hint="Beats per minute"
+            disabled={isProcessing}
+          />
           
-          <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <ControlSlider
-              label="Lo-fi Effect"
-              value={settings.bitcrusher}
-              onChange={value => handleChange('bitcrusher', value)}
-              min={0}
-              max={50}
-              icon={<Music size={18} />}
-              suffix="%"
-              hint="Bit reduction"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Pitch Shift"
-              value={settings.pitchShift}
-              onChange={value => handleChange('pitchShift', value)}
-              min={-6}
-              max={6}
-              icon={<Waves size={18} />}
-              suffix=" st"
-              hint="Semitone shift"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Sample Rate"
-              value={settings.sampleRateReduction}
-              onChange={value => handleChange('sampleRateReduction', value)}
-              min={0}
-              max={80}
-              icon={<Radio size={18} />}
-              suffix="%"
-              hint="Quality reduction"
-              disabled={isProcessing}
-            />
-            
-            <ControlSlider
-              label="Saturation"
-              value={settings.saturation}
-              onChange={value => handleChange('saturation', value)}
-              min={0}
-              max={100}
-              icon={<Zap size={18} />}
-              suffix="%"
-              hint="Analog warmth"
-              disabled={isProcessing}
-            />
-          </div>
+          <ControlSlider
+            label="Reverb"
+            value={settings.reverb}
+            onChange={value => handleChange('reverb', value)}
+            min={0}
+            max={100}
+            icon={<Volume2 size={18} />}
+            suffix="%"
+            hint="Room ambience"
+            disabled={isProcessing}
+          />
+          
+          <ControlSlider
+            label="Filter"
+            value={settings.filter}
+            onChange={value => handleChange('filter', value)}
+            min={0}
+            max={100}
+            icon={<Filter size={18} />}
+            suffix="%"
+            hint="Lo-pass warmth"
+            disabled={isProcessing}
+          />
+          
+          <ControlSlider
+            label="Lo-fi Effect"
+            value={settings.bitcrusher}
+            onChange={value => handleChange('bitcrusher', value)}
+            min={0}
+            max={100}
+            icon={<Music size={18} />}
+            suffix="%"
+            hint="Vintage degradation"
+            disabled={isProcessing}
+          />
+          
+          <ControlSlider
+            label="Pitch Shift"
+            value={settings.pitchShift}
+            onChange={value => handleChange('pitchShift', value)}
+            min={-6}
+            max={6}
+            icon={<Waves size={18} />}
+            suffix=" st"
+            hint="Tape wobble"
+            disabled={isProcessing}
+          />
         </div>
         
         <div className="flex justify-center mt-4">

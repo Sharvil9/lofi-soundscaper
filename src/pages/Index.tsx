@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -23,11 +22,9 @@ const Index = () => {
     bpm: 85,
     reverb: 30,
     filter: 40,
-    noise: 15,
-    bitcrusher: 10,
-    pitchShift: 0,
-    sampleRateReduction: 20,
-    saturation: 25,
+    noise: 0,        // Disabled vinyl noise
+    bitcrusher: 25,  // Better default
+    pitchShift: -1,  // Slight pitch down for lo-fi feel
   });
   
   const handleMediaSubmit = async (url: string) => {
