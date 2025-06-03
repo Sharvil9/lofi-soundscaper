@@ -1,6 +1,8 @@
+
 import { toast } from "sonner";
 import { LofiSettings } from "@/components/LofiControls";
 import { ClientAudioProcessor } from "./clientAudioProcessor";
+import { AudioFormatConverter } from "./audioFormatConverter";
 
 export interface AudioSource {
   title: string;
@@ -92,10 +94,13 @@ export const processToLofi = async (
       throw new Error("No original file available for processing");
     }
     
-    // Process the audio with lo-fi settings
-    const processedBlob = await audioProcessor.processToLofi(settings);
+    // Process the audio with lo-fi settings - this returns an AudioBuffer
+    const processedBuffer = await audioProcessor.processToLofi(settings);
     
-    // Create URL for the processed audio
+    // Convert the AudioBuffer to a WAV Blob
+    const processedBlob = AudioFormatConverter.audioBufferToWav(processedBuffer);
+    
+    // Create URL for the processed audio blob
     const processedUrl = URL.createObjectURL(processedBlob);
     
     console.log("Processed audio URL:", processedUrl);
