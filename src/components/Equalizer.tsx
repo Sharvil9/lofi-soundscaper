@@ -10,7 +10,7 @@ interface EqualizerProps {
 }
 
 const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
-  const [gains, setGains] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // 10 bands
+  const [gains, setGains] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
   const [filters, setFilters] = useState<BiquadFilterNode[]>([]);
   const [source, setSource] = useState<MediaElementAudioSourceNode | null>(null);
@@ -24,7 +24,6 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
         const context = new (window.AudioContext || (window as any).webkitAudioContext)();
         const sourceNode = context.createMediaElementSource(audioElement);
         
-        // Create filters for each frequency band
         const filterNodes = frequencies.map((freq, index) => {
           const filter = context.createBiquadFilter();
           filter.type = index === 0 ? 'lowshelf' : index === frequencies.length - 1 ? 'highshelf' : 'peaking';
@@ -34,14 +33,12 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
           return filter;
         });
 
-        // Connect filters in series
         let lastNode: AudioNode = sourceNode;
         filterNodes.forEach(filter => {
           lastNode.connect(filter);
           lastNode = filter;
         });
         
-        // Connect to destination
         lastNode.connect(context.destination);
 
         setAudioContext(context);
@@ -86,9 +83,9 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-semibold">Equalizer</h3>
+          <h3 className="text-xl font-semibold">10-Band Equalizer</h3>
           <div className="flex items-center gap-2">
             <Button
               onClick={resetEqualizer}
@@ -108,13 +105,20 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
           </div>
         </div>
 
-        <div className="flex items-end justify-center gap-4 h-64 mb-4">
+        <div className="flex items-end justify-center gap-3 h-80 mb-6 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
           {gains.map((gain, index) => (
-            <div key={index} className="flex flex-col items-center gap-2">
-              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
-                +{Math.max(0, Math.round(gain))}
+            <div key={index} className="flex flex-col items-center gap-2 h-full">
+              {/* Gain display */}
+              <div className="text-xs font-mono text-gray-600 dark:text-gray-400 h-6 flex items-center justify-center">
+                {gain > 0 ? `+${Math.round(gain)}` : Math.round(gain)}dB
               </div>
-              <div className="relative h-40 w-8">
+              
+              {/* Vertical slider container */}
+              <div className="relative flex-1 w-8 flex items-center justify-center">
+                <div className="absolute w-1 h-full bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                <div className="absolute w-3 h-px bg-gray-400 dark:text-gray-500" style={{ top: '50%' }}></div>
+                
+                {/* Vertical range input */}
                 <input
                   type="range"
                   min="-20"
@@ -122,22 +126,30 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
                   step="0.5"
                   value={gain}
                   onChange={(e) => handleGainChange(index, parseFloat(e.target.value))}
-                  className="absolute inset-0 w-full h-full appearance-none bg-transparent [writing-mode:bt-lr] slider-vertical"
+                  className="absolute w-full h-4 appearance-none bg-transparent cursor-pointer vertical-slider"
                   style={{
-                    background: `linear-gradient(to top, 
-                      transparent ${((20 + gain) / 40) * 100}%, 
-                      #3b82f6 ${((20 + gain) / 40) * 100}%, 
-                      #3b82f6 50%, 
-                      transparent 50%)`
+                    transform: 'rotate(-90deg)',
+                    transformOrigin: 'center',
+                    width: '200px',
+                    height: '16px',
+                    left: '-92px',
+                    top: '50%',
+                    marginTop: '-8px'
                   }}
                 />
-                <div className="absolute inset-0 w-full bg-gray-200 dark:bg-gray-700 rounded-full -z-10"></div>
-                <div className="absolute top-1/2 left-0 w-full h-px bg-gray-400 dark:bg-gray-600 -z-10"></div>
+                
+                {/* Visual indicator */}
+                <div 
+                  className="absolute w-3 h-3 bg-blue-500 rounded-full pointer-events-none shadow-lg"
+                  style={{
+                    top: `${50 - (gain / 40) * 100}%`,
+                    transform: 'translateY(-50%)'
+                  }}
+                ></div>
               </div>
-              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
-                -{Math.max(0, Math.round(-gain))}
-              </div>
-              <div className="text-xs text-center font-medium mt-1">
+              
+              {/* Frequency label */}
+              <div className="text-xs text-center font-medium mt-2 h-8 flex items-center justify-center">
                 {labels[index]}
               </div>
             </div>
@@ -145,9 +157,40 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
         </div>
 
         <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-          Adjust frequency bands to customize your audio output
+          Move sliders vertically to adjust frequency bands • Changes apply in real-time
         </div>
       </div>
+
+      <style jsx>{`
+        .vertical-slider::-webkit-slider-thumb {
+          appearance: none;
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+          border: 2px solid white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .vertical-slider::-moz-range-thumb {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+          border: 2px solid white;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .vertical-slider::-webkit-slider-track {
+          background: transparent;
+        }
+        
+        .vertical-slider::-moz-range-track {
+          background: transparent;
+        }
+      `}</style>
     </div>
   );
 };

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Volume2, Clock, Filter, Music, Wand2, Play, Waves, Save, Undo, Redo, Settings } from 'lucide-react';
+import { Volume2, Clock, Filter, Music, Wand2, Play, Waves, Settings, Undo, Redo, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
 import PresetManager from './PresetManager';
@@ -9,8 +9,7 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 export interface LofiSettings {
   bpm: number;           
   reverb: number;
-  filter: number;
-  noise: number;         
+  filter: number;        
   bitcrusher: number;
   pitchShift: number;
 }
@@ -21,14 +20,21 @@ interface LofiControlsProps {
   onProcess: () => void;
   onPreviewToggle?: (enabled: boolean) => void;
   isPreviewEnabled?: boolean;
+  processingProgress?: { progress: number; stage: string };
 }
 
-const LofiControls = ({ onChange, isProcessing, onProcess, onPreviewToggle, isPreviewEnabled = false }: LofiControlsProps) => {
+const LofiControls = ({ 
+  onChange, 
+  isProcessing, 
+  onProcess, 
+  onPreviewToggle, 
+  isPreviewEnabled = false,
+  processingProgress
+}: LofiControlsProps) => {
   const [settings, setSettings] = useState<LofiSettings>({
     bpm: 85,
     reverb: 30,
-    filter: 40,
-    noise: 0,             
+    filter: 40,      
     bitcrusher: 25,       
     pitchShift: -1,       
   });
@@ -160,7 +166,7 @@ const LofiControls = ({ onChange, isProcessing, onProcess, onPreviewToggle, isPr
             max={120}
             icon={<Clock size={18} />}
             suffix=" BPM"
-            hint="Beats per minute"
+            hint="Tempo change"
             disabled={isProcessing}
           />
           
@@ -172,7 +178,7 @@ const LofiControls = ({ onChange, isProcessing, onProcess, onPreviewToggle, isPr
             max={100}
             icon={<Volume2 size={18} />}
             suffix="%"
-            hint="Room ambience"
+            hint="Space and ambience"
             disabled={isProcessing}
           />
           
@@ -217,10 +223,22 @@ const LofiControls = ({ onChange, isProcessing, onProcess, onPreviewToggle, isPr
           <Button 
             onClick={onProcess} 
             disabled={isProcessing} 
-            className="bg-accent hover:bg-accent/90 text-white font-medium px-8 py-2"
+            className="bg-accent hover:bg-accent/90 text-white font-medium px-8 py-3 text-base min-w-[200px] flex items-center justify-center gap-2"
           >
-            <Play size={16} className="mr-2" />
-            Process Audio
+            {isProcessing ? (
+              <>
+                <RefreshCw size={18} className="animate-spin" />
+                <div className="flex flex-col items-start text-left">
+                  <span className="text-sm">{Math.round(processingProgress?.progress || 0)}%</span>
+                  <span className="text-xs opacity-80">{processingProgress?.stage || 'Processing...'}</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <Play size={16} />
+                Process Audio
+              </>
+            )}
           </Button>
         </div>
       </div>

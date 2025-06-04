@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -7,7 +8,6 @@ import AudioVisualizer from '@/components/AudioVisualizer';
 import AudioPlayer from '@/components/AudioPlayer';
 import ThumbnailDisplay from '@/components/ThumbnailDisplay';
 import FeatureBanner from '@/components/FeatureBanner';
-import ProcessingProgress from '@/components/ProcessingProgress';
 import { AudioSource, handleFileUpload as processFileUpload, cleanupAudioProcessor } from '@/lib/audioService';
 import { ClientAudioProcessor, ProcessingProgress as ProcessingProgressType } from '@/lib/clientAudioProcessor';
 import { AudioFormatConverter } from '@/lib/audioFormatConverter';
@@ -32,14 +32,11 @@ const Index = () => {
     bpm: 85,
     reverb: 30,
     filter: 40,
-    noise: 0,        // Disabled vinyl noise
-    bitcrusher: 25,  // Better default
-    pitchShift: -1,  // Slight pitch down for lo-fi feel
+    bitcrusher: 25,
+    pitchShift: -1,
   });
   
   const handleMediaSubmit = async (url: string) => {
-    // This will always show the humorous error now
-    // The YouTubeInput component handles this
     console.log("Link submission attempted (but not supported):", url);
   };
   
@@ -51,11 +48,9 @@ const Index = () => {
     setIsPlaying(false);
     
     try {
-      // Process the uploaded file
       const source = await processFileUpload(file);
       setAudioSource(source);
       
-      // Initialize audio processor
       if (!audioProcessorRef.current) {
         audioProcessorRef.current = new ClientAudioProcessor();
       }
@@ -75,7 +70,6 @@ const Index = () => {
   const handleSettingsChange = useCallback((settings: LofiSettings) => {
     setLofiSettings(settings);
     
-    // Handle real-time preview
     if (isPreviewEnabled && audioProcessorRef.current && audioSource) {
       audioProcessorRef.current.stopPreview();
       audioProcessorRef.current.startPreview(settings).catch(console.error);
@@ -112,7 +106,6 @@ const Index = () => {
     setProcessingProgress({ progress: 0, stage: 'Starting...' });
     
     try {
-      // Process audio
       const processedAudioBuffer = await audioProcessorRef.current.processToLofi(
         lofiSettings, 
         setProcessingProgress
@@ -120,12 +113,10 @@ const Index = () => {
       
       setProcessedBuffer(processedAudioBuffer);
       
-      // Convert to blob for playback
       const wavBlob = AudioFormatConverter.audioBufferToWav(processedAudioBuffer);
       const url = URL.createObjectURL(wavBlob);
       setLofiAudioUrl(url);
       
-      // Auto-play the newly processed lo-fi version
       setTimeout(() => {
         setIsPlaying(true);
       }, 500);
@@ -164,7 +155,6 @@ const Index = () => {
     }
   };
   
-  // Cleanup audio processor on unmount
   useEffect(() => {
     return () => {
       if (audioProcessorRef.current) {
@@ -174,7 +164,6 @@ const Index = () => {
     };
   }, []);
   
-  // Handle auto-play
   useEffect(() => {
     if (lofiAudioUrl && isPlaying && audioPlayerRef.current) {
       console.log("Auto-playing lo-fi version");
@@ -189,7 +178,6 @@ const Index = () => {
     }
   }, [lofiAudioUrl, isPlaying]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.target instanceof HTMLInputElement) return;
@@ -280,12 +268,28 @@ const Index = () => {
                   isProcessing={isProcessing}
                 />
                 
+                {/* Audio Player - positioned after upload/thumbnail */}
+                {lofiAudioUrl && (
+                  <AudioPlayer 
+                    originalAudioUrl={audioSource.audioUrl}
+                    lofiAudioUrl={lofiAudioUrl}
+                    onTogglePlay={setIsPlaying}
+                    isProcessing={isProcessing}
+                    songTitle={audioSource.title}
+                    thumbnailUrl={audioSource.thumbnailUrl}
+                    isPlaying={isPlaying}
+                    ref={audioPlayerRef}
+                    autoPlayLofi={true}
+                  />
+                )}
+                
                 <LofiControls 
                   onChange={handleSettingsChange}
                   isProcessing={isProcessing}
                   onProcess={applyLofiSettings}
                   onPreviewToggle={handlePreviewToggle}
                   isPreviewEnabled={isPreviewEnabled}
+                  processingProgress={processingProgress}
                 />
                 
                 {/* Export Options */}
@@ -306,55 +310,46 @@ const Index = () => {
                   </div>
                 )}
                 
-                <FeatureBanner />
-                
                 <AudioVisualizer 
                   audioUrl={isPlaying ? (lofiAudioUrl || audioSource.audioUrl) : undefined}
                   isPlaying={isPlaying}
-                />
-                
-                <AudioPlayer 
-                  originalAudioUrl={audioSource.audioUrl}
-                  lofiAudioUrl={lofiAudioUrl}
-                  onTogglePlay={setIsPlaying}
-                  isProcessing={isProcessing}
-                  songTitle={audioSource.title}
-                  thumbnailUrl={audioSource.thumbnailUrl}
-                  isPlaying={isPlaying}
-                  ref={audioPlayerRef}
-                  autoPlayLofi={true}
                 />
               </>
             )}
           </div>
           
-          {!audioSource && (
-            <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-                <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
-              </div>
-              <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
-                  <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
-                </div>
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
-                  <p className="text-sm">Customize the tempo, reverb, filters, and background noise</p>
-                </div>
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
-                  <p className="text-sm">Process and save the lo-fi version to your device</p>
-                </div>
-              </div>
+          {/* "How it works" section moved to bottom when no audio or after processing */}
+          {(!audioSource || processedBuffer) && (
+            <>
+              <FeatureBanner />
               
-              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
-                </p>
+              <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
+                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
+                  <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
+                </div>
+                <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
+                  <div>
+                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
+                    <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
+                  </div>
+                  <div>
+                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
+                    <p className="text-sm">Customize the tempo, reverb, filters, and effects intensity</p>
+                  </div>
+                  <div>
+                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
+                    <p className="text-sm">Process and save the lo-fi version to your device</p>
+                  </div>
+                </div>
+                
+                <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
+                  </p>
+                </div>
               </div>
-            </div>
+            </>
           )}
         </main>
         
@@ -362,12 +357,6 @@ const Index = () => {
           <p>Created with ♥ for lo-fi music enthusiasts • Fully client-side processing</p>
         </footer>
       </div>
-      
-      <ProcessingProgress
-        isVisible={isProcessing}
-        progress={processingProgress.progress}
-        stage={processingProgress.stage}
-      />
     </div>
   );
 };
