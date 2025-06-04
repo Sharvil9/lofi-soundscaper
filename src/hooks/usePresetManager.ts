@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { LofiSettings } from '@/components/LofiControls';
 import { toast } from 'sonner';
@@ -20,7 +19,6 @@ const defaultPresets: LofiPreset[] = [
       bpm: 85,
       reverb: 35,
       filter: 45,
-      noise: 0,
       bitcrusher: 30,
       pitchShift: -1,
     },
@@ -33,7 +31,6 @@ const defaultPresets: LofiPreset[] = [
       bpm: 80,
       reverb: 45,
       filter: 55,
-      noise: 0,
       bitcrusher: 40,
       pitchShift: -1.5,
     },
@@ -46,7 +43,6 @@ const defaultPresets: LofiPreset[] = [
       bpm: 70,
       reverb: 60,
       filter: 70,
-      noise: 0,
       bitcrusher: 20,
       pitchShift: -2,
     },
@@ -59,7 +55,6 @@ const defaultPresets: LofiPreset[] = [
       bpm: 75,
       reverb: 50,
       filter: 65,
-      noise: 0,
       bitcrusher: 60,
       pitchShift: -1.5,
     },

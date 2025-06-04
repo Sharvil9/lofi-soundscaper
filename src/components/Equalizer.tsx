@@ -161,7 +161,7 @@ const Equalizer = ({ isOpen, onClose, audioElement }: EqualizerProps) => {
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .vertical-slider::-webkit-slider-thumb {
           appearance: none;
           width: 16px;
