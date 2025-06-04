@@ -227,38 +227,44 @@ const Index = () => {
           </div>
           
           <div className="space-y-6">
-            {/* Tab navigation for link/upload */}
-            <div className="flex justify-center mb-4">
-              <div className="flex rounded-lg bg-lofi-100 dark:bg-lofi-800 p-1 shadow-inner">
-                <button 
-                  onClick={() => setActiveTab('link')} 
-                  className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
-                >
-                  Paste Link
-                  <span className="absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1">😅</span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('upload')} 
-                  className={`px-4 py-2 rounded-md ${activeTab === 'upload' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
-                >
-                  Upload File
-                  <span className="absolute -top-1 -right-1 text-xs bg-green-500 text-white rounded-full px-1">✓</span>
-                </button>
-              </div>
-            </div>
-            
-            {activeTab === 'link' ? (
-              <YouTubeInput 
-                onSubmit={handleMediaSubmit}
-                isLoading={isLoading}
-              />
-            ) : (
-              <FileUpload 
-                onUpload={handleFileUpload}
-                isLoading={isLoading}
-              />
+            {/* Upload Section - Always at top */}
+            {!audioSource && (
+              <>
+                {/* Tab navigation for link/upload */}
+                <div className="flex justify-center mb-4">
+                  <div className="flex rounded-lg bg-lofi-100 dark:bg-lofi-800 p-1 shadow-inner">
+                    <button 
+                      onClick={() => setActiveTab('link')} 
+                      className={`px-4 py-2 rounded-md ${activeTab === 'link' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
+                    >
+                      Paste Link
+                      <span className="absolute -top-1 -right-1 text-xs bg-red-500 text-white rounded-full px-1">😅</span>
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('upload')} 
+                      className={`px-4 py-2 rounded-md ${activeTab === 'upload' ? 'bg-accent text-white shadow' : 'text-lofi-600 dark:text-lofi-300'} transition-all relative`}
+                    >
+                      Upload File
+                      <span className="absolute -top-1 -right-1 text-xs bg-green-500 text-white rounded-full px-1">✓</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {activeTab === 'link' ? (
+                  <YouTubeInput 
+                    onSubmit={handleMediaSubmit}
+                    isLoading={isLoading}
+                  />
+                ) : (
+                  <FileUpload 
+                    onUpload={handleFileUpload}
+                    isLoading={isLoading}
+                  />
+                )}
+              </>
             )}
-            
+
+            {/* After Upload: Presets/Settings and Audio Player */}
             {audioSource && (
               <>
                 <ThumbnailDisplay 
@@ -267,7 +273,16 @@ const Index = () => {
                   isProcessing={isProcessing}
                 />
                 
-                {/* Audio Player - positioned after upload/thumbnail */}
+                <LofiControls 
+                  onChange={handleSettingsChange}
+                  isProcessing={isProcessing}
+                  onProcess={applyLofiSettings}
+                  onPreviewToggle={handlePreviewToggle}
+                  isPreviewEnabled={isPreviewEnabled}
+                  processingProgress={processingProgress}
+                />
+                
+                {/* Audio Player - positioned after presets/settings */}
                 {lofiAudioUrl && (
                   <AudioPlayer 
                     originalAudioUrl={audioSource.audioUrl}
@@ -281,15 +296,6 @@ const Index = () => {
                     autoPlayLofi={true}
                   />
                 )}
-                
-                <LofiControls 
-                  onChange={handleSettingsChange}
-                  isProcessing={isProcessing}
-                  onProcess={applyLofiSettings}
-                  onPreviewToggle={handlePreviewToggle}
-                  isPreviewEnabled={isPreviewEnabled}
-                  processingProgress={processingProgress}
-                />
                 
                 {/* Export Options */}
                 {processedBuffer && (
@@ -317,10 +323,7 @@ const Index = () => {
             )}
           </div>
           
-          {/* Enhanced Lo-fi Experience - always shown */}
-          <FeatureBanner />
-          
-          {/* "How it works" section - shown before upload OR at bottom after processing */}
+          {/* "How it works" section - only shown before upload */}
           {!audioSource && (
             <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
               <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
@@ -350,35 +353,8 @@ const Index = () => {
             </div>
           )}
           
-          {/* "How it works" section moved to bottom after processing */}
-          {processedBuffer && (
-            <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-                <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
-              </div>
-              <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
-                  <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
-                </div>
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
-                  <p className="text-sm">Customize the tempo, reverb, filters, and effects intensity</p>
-                </div>
-                <div>
-                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
-                  <p className="text-sm">Process and save the lo-fi version to your device</p>
-                </div>
-              </div>
-              
-              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Enhanced Lo-fi Experience - always shown */}
+          <FeatureBanner />
         </main>
         
         <footer className="mt-16 text-center text-sm text-lofi-500 dark:text-lofi-400">
