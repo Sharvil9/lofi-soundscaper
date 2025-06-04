@@ -15,6 +15,7 @@ export class ClientAudioProcessor {
   private previewSource: AudioBufferSourceNode | null = null;
   private previewGain: GainNode | null = null;
   private isPreviewActive = false;
+  private previewNodes: AudioNode[] = [];
 
   constructor() {
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -33,16 +34,18 @@ export class ClientAudioProcessor {
   }
 
   async startPreview(settings: LofiSettings, onProgress?: (progress: ProcessingProgress) => void): Promise<void> {
-    if (!this.audioBuffer || this.isPreviewActive) return;
+    if (!this.audioBuffer) return;
+
+    // Stop any existing preview
+    this.stopPreview();
 
     try {
-      if (onProgress) onProgress({ progress: 10, stage: "Initializing preview..." });
+      if (onProgress) onProgress({ progress: 10, stage: "Starting live preview..." });
 
       this.previewAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       
-      if (onProgress) onProgress({ progress: 30, stage: "Setting up audio effects..." });
-
-      const previewDuration = Math.min(10, this.audioBuffer.duration);
+      // Create a short preview buffer (5 seconds)
+      const previewDuration = Math.min(5, this.audioBuffer.duration);
       const previewLength = Math.floor(previewDuration * this.audioBuffer.sampleRate);
       
       const previewBuffer = this.previewAudioContext.createBuffer(
@@ -59,114 +62,35 @@ export class ClientAudioProcessor {
         }
       }
 
-      if (onProgress) onProgress({ progress: 60, stage: "Applying lo-fi effects..." });
-
       this.previewSource = this.previewAudioContext.createBufferSource();
       this.previewSource.buffer = previewBuffer;
+      this.previewSource.loop = true;
 
       let currentNode: AudioNode = this.previewSource;
 
-      // Enhanced BPM change with proper time stretching simulation
+      // Apply BPM change (tempo only, no pitch change)
       if (settings.bpm !== 85) {
         const tempoRatio = settings.bpm / 85;
-        const playbackRate = Math.max(0.5, Math.min(2.0, tempoRatio));
-        this.previewSource.playbackRate.value = playbackRate;
+        this.previewSource.playbackRate.value = tempoRatio;
       }
 
-      // Pitch shift
+      // Apply pitch shift separately (without affecting tempo)
       if (settings.pitchShift !== 0) {
         this.previewSource.detune.value = settings.pitchShift * 100;
       }
 
-      // Enhanced aggressive low-pass filter
-      const lowPassFilter = this.previewAudioContext.createBiquadFilter();
-      lowPassFilter.type = 'lowpass';
-      const filterIntensity = settings.filter / 100;
-      lowPassFilter.frequency.value = Math.max(300, 8000 - (filterIntensity * 6000));
-      lowPassFilter.Q.value = 1 + (filterIntensity * 8);
-      currentNode.connect(lowPassFilter);
-      currentNode = lowPassFilter;
-
-      // High-pass filter for lo-fi character
-      const highPassFilter = this.previewAudioContext.createBiquadFilter();
-      highPassFilter.type = 'highpass';
-      highPassFilter.frequency.value = 80 + (filterIntensity * 200);
-      highPassFilter.Q.value = 1.5;
-      currentNode.connect(highPassFilter);
-      currentNode = highPassFilter;
-
-      // Enhanced reverb with multiple delays
-      if (settings.reverb > 0) {
-        const reverbAmount = settings.reverb / 100;
-        const delay1 = this.previewAudioContext.createDelay(2);
-        const delay2 = this.previewAudioContext.createDelay(2);
-        const delay3 = this.previewAudioContext.createDelay(2);
-        const feedback = this.previewAudioContext.createGain();
-        const wetGain = this.previewAudioContext.createGain();
-        const dryGain = this.previewAudioContext.createGain();
-        const output = this.previewAudioContext.createGain();
-
-        delay1.delayTime.value = 0.1 + (reverbAmount * 0.3);
-        delay2.delayTime.value = 0.15 + (reverbAmount * 0.4);
-        delay3.delayTime.value = 0.2 + (reverbAmount * 0.5);
-        feedback.gain.value = Math.min(0.8, reverbAmount * 0.9);
-        wetGain.gain.value = reverbAmount * 0.6;
-        dryGain.gain.value = 1 - (reverbAmount * 0.4);
-
-        currentNode.connect(dryGain);
-        currentNode.connect(delay1);
-        delay1.connect(delay2);
-        delay2.connect(delay3);
-        delay3.connect(feedback);
-        feedback.connect(delay1);
-        delay3.connect(wetGain);
-
-        dryGain.connect(output);
-        wetGain.connect(output);
-        currentNode = output;
-      }
-
-      // Enhanced bit crusher with better algorithm
-      if (settings.bitcrusher > 0) {
-        const waveshaper = this.previewAudioContext.createWaveShaper();
-        const mix = settings.bitcrusher / 100;
-        const samples = 2048;
-        const curve = new Float32Array(samples);
-        
-        for (let i = 0; i < samples; i++) {
-          const x = (i * 2) / samples - 1;
-          const bitDepth = Math.max(2, 12 - (mix * 8));
-          const step = Math.pow(2, bitDepth);
-          let crushed = Math.round(x * step) / step;
-          
-          // Add saturation and warmth
-          crushed = Math.tanh(crushed * (1 + mix * 2)) * 0.8;
-          
-          // Mix with original
-          curve[i] = x * (1 - mix * 0.8) + crushed * mix;
-        }
-        
-        waveshaper.curve = curve;
-        waveshaper.oversample = '4x';
-        currentNode.connect(waveshaper);
-        currentNode = waveshaper;
-      }
-
-      if (onProgress) onProgress({ progress: 90, stage: "Starting preview..." });
+      // Apply effects
+      currentNode = this.applyEffects(currentNode, settings, this.previewAudioContext);
 
       this.previewGain = this.previewAudioContext.createGain();
-      this.previewGain.gain.value = 0.7;
+      this.previewGain.gain.value = 0.5;
       currentNode.connect(this.previewGain);
       this.previewGain.connect(this.previewAudioContext.destination);
 
       this.previewSource.start(0);
       this.isPreviewActive = true;
 
-      if (onProgress) onProgress({ progress: 100, stage: "Preview started!" });
-
-      setTimeout(() => {
-        this.stopPreview();
-      }, previewDuration * 1000);
+      if (onProgress) onProgress({ progress: 100, stage: "Live preview active!" });
 
     } catch (error) {
       console.error("Error starting preview:", error);
@@ -185,12 +109,95 @@ export class ClientAudioProcessor {
       this.previewSource = null;
     }
 
+    this.previewNodes.forEach(node => {
+      try {
+        node.disconnect();
+      } catch (error) {
+        // Node might already be disconnected
+      }
+    });
+    this.previewNodes = [];
+
     if (this.previewAudioContext) {
       this.previewAudioContext.close();
       this.previewAudioContext = null;
     }
 
     this.isPreviewActive = false;
+  }
+
+  private applyEffects(inputNode: AudioNode, settings: LofiSettings, context: AudioContext): AudioNode {
+    let currentNode = inputNode;
+
+    // Low-pass filter for warmth
+    if (settings.filter > 0) {
+      const lowPassFilter = context.createBiquadFilter();
+      lowPassFilter.type = 'lowpass';
+      const filterIntensity = settings.filter / 100;
+      lowPassFilter.frequency.value = Math.max(300, 8000 - (filterIntensity * 6000));
+      lowPassFilter.Q.value = 1 + (filterIntensity * 8);
+      currentNode.connect(lowPassFilter);
+      currentNode = lowPassFilter;
+      this.previewNodes.push(lowPassFilter);
+
+      // Add high-pass for character
+      const highPassFilter = context.createBiquadFilter();
+      highPassFilter.type = 'highpass';
+      highPassFilter.frequency.value = 80 + (filterIntensity * 200);
+      highPassFilter.Q.value = 1.5;
+      currentNode.connect(highPassFilter);
+      currentNode = highPassFilter;
+      this.previewNodes.push(highPassFilter);
+    }
+
+    // Reverb
+    if (settings.reverb > 0) {
+      const convolver = context.createConvolver();
+      convolver.buffer = this.createReverbImpulse(context, settings.reverb / 100);
+      
+      const inputGain = context.createGain();
+      const dryGain = context.createGain();
+      const wetGain = context.createGain();
+      const outputGain = context.createGain();
+      
+      const wetAmount = settings.reverb / 100;
+      dryGain.gain.value = 1 - (wetAmount * 0.5);
+      wetGain.gain.value = wetAmount * 0.6;
+      
+      currentNode.connect(inputGain);
+      inputGain.connect(dryGain);
+      inputGain.connect(convolver);
+      convolver.connect(wetGain);
+      
+      dryGain.connect(outputGain);
+      wetGain.connect(outputGain);
+      currentNode = outputGain;
+      
+      this.previewNodes.push(convolver, inputGain, dryGain, wetGain, outputGain);
+    }
+
+    // Enhanced Lo-fi effect (vinyl crackle and warmth)
+    if (settings.bitcrusher > 0) {
+      const waveshaper = context.createWaveShaper();
+      waveshaper.curve = this.createVinylCrackleEffect(settings.bitcrusher);
+      waveshaper.oversample = '4x';
+      currentNode.connect(waveshaper);
+      currentNode = waveshaper;
+      this.previewNodes.push(waveshaper);
+      
+      // Add some vintage warmth with a subtle compressor
+      const compressor = context.createDynamicsCompressor();
+      compressor.threshold.value = -18;
+      compressor.knee.value = 4;
+      compressor.ratio.value = 2;
+      compressor.attack.value = 0.001;
+      compressor.release.value = 0.05;
+      currentNode.connect(compressor);
+      currentNode = compressor;
+      this.previewNodes.push(compressor);
+    }
+
+    return currentNode;
   }
 
   async processToLofi(
@@ -202,11 +209,11 @@ export class ClientAudioProcessor {
     }
 
     try {
-      console.log("Processing audio with enhanced settings:", settings);
+      console.log("Processing audio with settings:", settings);
       
-      if (onProgress) onProgress({ progress: 5, stage: "Initializing audio processing..." });
+      if (onProgress) onProgress({ progress: 5, stage: "Initializing..." });
 
-      // Create buffer with tempo change
+      // Calculate new length based on BPM change only
       const tempoRatio = settings.bpm / 85;
       const newLength = Math.floor(this.audioBuffer.length / tempoRatio);
       const newSampleRate = this.audioBuffer.sampleRate;
@@ -221,97 +228,48 @@ export class ClientAudioProcessor {
 
       const source = offlineContext.createBufferSource();
       source.buffer = this.audioBuffer;
+      
+      // Apply tempo change
       source.playbackRate.value = tempoRatio;
-
-      // Pitch shift
+      
+      // Apply pitch shift separately (this won't affect tempo when using detune)
       if (settings.pitchShift !== 0) {
         source.detune.value = settings.pitchShift * 100;
       }
 
       let currentNode: AudioNode = source;
 
-      if (onProgress) onProgress({ progress: 30, stage: "Applying aggressive filters..." });
+      if (onProgress) onProgress({ progress: 30, stage: "Applying filters..." });
 
-      // Much more aggressive low-pass filter
-      const lowPassFilter = offlineContext.createBiquadFilter();
-      lowPassFilter.type = 'lowpass';
-      const filterIntensity = settings.filter / 100;
-      lowPassFilter.frequency.value = Math.max(200, 6000 - (filterIntensity * 4500));
-      lowPassFilter.Q.value = 2 + (filterIntensity * 12);
-      currentNode.connect(lowPassFilter);
-      currentNode = lowPassFilter;
+      // Apply all effects
+      currentNode = this.applyEffects(currentNode, settings, offlineContext);
 
-      // High-pass for character
-      const highPassFilter = offlineContext.createBiquadFilter();
-      highPassFilter.type = 'highpass';
-      highPassFilter.frequency.value = 100 + (filterIntensity * 300);
-      highPassFilter.Q.value = 2;
-      currentNode.connect(highPassFilter);
-      currentNode = highPassFilter;
+      if (onProgress) onProgress({ progress: 80, stage: "Final processing..." });
 
-      if (onProgress) onProgress({ progress: 50, stage: "Creating lush reverb..." });
+      // Master compression for lo-fi character
+      const masterCompressor = offlineContext.createDynamicsCompressor();
+      masterCompressor.threshold.value = -20;
+      masterCompressor.knee.value = 6;
+      masterCompressor.ratio.value = 3;
+      masterCompressor.attack.value = 0.001;
+      masterCompressor.release.value = 0.1;
+      currentNode.connect(masterCompressor);
+      currentNode = masterCompressor;
 
-      // Enhanced Reverb with convolver
-      if (settings.reverb > 0) {
-        const convolver = offlineContext.createConvolver();
-        convolver.buffer = this.createEnhancedReverbImpulse(offlineContext, settings.reverb / 100);
-        
-        const inputGain = offlineContext.createGain();
-        const dryGain = offlineContext.createGain();
-        const wetGain = offlineContext.createGain();
-        const outputGain = offlineContext.createGain();
-        
-        const wetAmount = settings.reverb / 100;
-        dryGain.gain.value = 1 - (wetAmount * 0.5);
-        wetGain.gain.value = wetAmount * 0.8;
-        
-        currentNode.connect(inputGain);
-        inputGain.connect(dryGain);
-        inputGain.connect(convolver);
-        convolver.connect(wetGain);
-        
-        dryGain.connect(outputGain);
-        wetGain.connect(outputGain);
-        currentNode = outputGain;
-      }
-
-      if (onProgress) onProgress({ progress: 70, stage: "Applying vintage bit crushing..." });
-
-      // Much more aggressive bit crusher
-      if (settings.bitcrusher > 0) {
-        const waveshaper = offlineContext.createWaveShaper();
-        waveshaper.curve = this.createEnhancedLofiCrushCurve(settings.bitcrusher);
-        waveshaper.oversample = '4x';
-        currentNode.connect(waveshaper);
-        currentNode = waveshaper;
-      }
-
-      if (onProgress) onProgress({ progress: 85, stage: "Applying vintage compression..." });
-
-      // Heavier compression for lo-fi character
-      const compressor = offlineContext.createDynamicsCompressor();
-      compressor.threshold.value = -24;
-      compressor.knee.value = 8;
-      compressor.ratio.value = 4;
-      compressor.attack.value = 0.001;
-      compressor.release.value = 0.1;
-      currentNode.connect(compressor);
-      currentNode = compressor;
-
-      // Master gain with gentle saturation
+      // Final output gain
       const masterGain = offlineContext.createGain();
-      masterGain.gain.value = 0.85;
+      masterGain.gain.value = 0.8;
       currentNode.connect(masterGain);
       masterGain.connect(offlineContext.destination);
 
-      if (onProgress) onProgress({ progress: 95, stage: "Rendering enhanced audio..." });
+      if (onProgress) onProgress({ progress: 90, stage: "Rendering audio..." });
 
       source.start(0);
       const renderedBuffer = await offlineContext.startRendering();
       
-      if (onProgress) onProgress({ progress: 100, stage: "Lo-fi processing complete!" });
+      if (onProgress) onProgress({ progress: 100, stage: "Complete!" });
       
-      toast.success("Enhanced lo-fi conversion complete!");
+      toast.success("Lo-fi processing complete!");
       return renderedBuffer;
       
     } catch (error) {
@@ -325,8 +283,8 @@ export class ClientAudioProcessor {
     return AudioFormatConverter.convertAudioBuffer(buffer, options);
   }
 
-  private createEnhancedReverbImpulse(context: OfflineAudioContext, reverbAmount: number): AudioBuffer {
-    const length = Math.floor(context.sampleRate * (1 + reverbAmount * 3));
+  private createReverbImpulse(context: AudioContext, reverbAmount: number): AudioBuffer {
+    const length = Math.floor(context.sampleRate * (1 + reverbAmount * 2));
     const impulse = context.createBuffer(2, length, context.sampleRate);
     
     for (let channel = 0; channel < 2; channel++) {
@@ -334,36 +292,35 @@ export class ClientAudioProcessor {
       for (let i = 0; i < length; i++) {
         const t = i / context.sampleRate;
         const decay = Math.exp(-t * (2 - reverbAmount)) * reverbAmount;
-        
-        // Multiple reflection pattern
-        const early = (Math.random() * 2 - 1) * Math.exp(-t * 20) * 0.8;
-        const late = (Math.random() * 2 - 1) * Math.exp(-t * 3) * 0.6;
-        const diffuse = (Math.random() * 2 - 1) * Math.exp(-t * 1) * 0.4;
-        
-        channelData[i] = (early + late + diffuse) * decay;
+        channelData[i] = (Math.random() * 2 - 1) * decay;
       }
     }
     
     return impulse;
   }
 
-  private createEnhancedLofiCrushCurve(amount: number): Float32Array {
-    const samples = 8192;
+  private createVinylCrackleEffect(amount: number): Float32Array {
+    const samples = 4096;
     const curve = new Float32Array(samples);
     
-    const bitReduction = 2 + (amount / 100) * 10;
-    const mix = Math.min(amount / 100, 0.9);
+    const intensity = amount / 100;
     
     for (let i = 0; i < samples; i++) {
       const x = (i * 2) / samples - 1;
-      const step = Math.pow(2, bitReduction);
-      let crushed = Math.round(x * step) / step;
       
-      // Add multiple stages of saturation
-      crushed = Math.tanh(crushed * (1 + mix * 3)) * 0.8;
-      crushed = Math.sign(crushed) * Math.pow(Math.abs(crushed), 0.7 + mix * 0.3);
+      // Add vinyl-style saturation and warmth
+      let processed = Math.tanh(x * (1 + intensity * 2)) * 0.9;
       
-      curve[i] = x * (1 - mix) + crushed * mix;
+      // Add subtle harmonic distortion for warmth
+      processed += Math.sin(x * Math.PI) * intensity * 0.1;
+      
+      // Add some random crackle texture
+      if (Math.random() < intensity * 0.02) {
+        processed += (Math.random() * 2 - 1) * intensity * 0.05;
+      }
+      
+      // Mix with original signal
+      curve[i] = x * (1 - intensity * 0.7) + processed * intensity;
     }
     
     return curve;

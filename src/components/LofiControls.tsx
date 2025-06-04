@@ -1,10 +1,10 @@
+
 import { useState, useEffect } from 'react';
-import { Volume2, Clock, Filter, Music, Wand2, Play, Waves, Settings, Undo, Redo, RefreshCw } from 'lucide-react';
+import { Volume2, Clock, Filter, Music, Wand2, Play, Waves, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "@/components/ui/carousel";
-import PresetManager from './PresetManager';
 import { usePresetManager } from '@/hooks/usePresetManager';
-import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 export interface LofiSettings {
   bpm: number;           
@@ -39,9 +39,7 @@ const LofiControls = ({
     pitchShift: -1,       
   });
   
-  const [showPresetManager, setShowPresetManager] = useState(false);
   const { loadPreset } = usePresetManager();
-  const { pushToHistory, undo, redo, canUndo, canRedo } = useUndoRedo(settings);
   
   useEffect(() => {
     onChange(settings);
@@ -53,34 +51,13 @@ const LofiControls = ({
       [property]: value
     };
     setSettings(newSettings);
-    pushToHistory(newSettings);
   };
   
   const applyPreset = (preset: string) => {
     const presetSettings = loadPreset(preset);
     if (presetSettings) {
       setSettings(presetSettings);
-      pushToHistory(presetSettings);
     }
-  };
-
-  const handleUndo = () => {
-    const previousSettings = undo();
-    if (previousSettings) {
-      setSettings(previousSettings);
-    }
-  };
-
-  const handleRedo = () => {
-    const nextSettings = redo();
-    if (nextSettings) {
-      setSettings(nextSettings);
-    }
-  };
-
-  const handlePresetLoad = (newSettings: LofiSettings) => {
-    setSettings(newSettings);
-    pushToHistory(newSettings);
   };
 
   return (
@@ -90,26 +67,6 @@ const LofiControls = ({
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium">Lo-fi Controls</h3>
           <div className="flex items-center gap-2">
-            {/* Undo/Redo */}
-            <Button
-              onClick={handleUndo}
-              disabled={!canUndo || isProcessing}
-              variant="outline"
-              size="sm"
-              className="p-2"
-            >
-              <Undo size={16} />
-            </Button>
-            <Button
-              onClick={handleRedo}
-              disabled={!canRedo || isProcessing}
-              variant="outline"
-              size="sm"
-              className="p-2"
-            >
-              <Redo size={16} />
-            </Button>
-            
             {/* Real-time Preview Toggle */}
             {onPreviewToggle && (
               <Button
@@ -121,17 +78,6 @@ const LofiControls = ({
                 {isPreviewEnabled ? "Preview On" : "Preview Off"}
               </Button>
             )}
-            
-            {/* Preset Manager */}
-            <Button
-              onClick={() => setShowPresetManager(true)}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <Settings size={16} />
-              Presets
-            </Button>
           </div>
         </div>
 
@@ -202,7 +148,7 @@ const LofiControls = ({
             max={100}
             icon={<Music size={18} />}
             suffix="%"
-            hint="Vintage degradation"
+            hint="Vinyl crackle & warmth"
             disabled={isProcessing}
           />
           
@@ -214,7 +160,7 @@ const LofiControls = ({
             max={6}
             icon={<Waves size={18} />}
             suffix=" st"
-            hint="Tape wobble"
+            hint="Pitch adjustment only"
             disabled={isProcessing}
           />
         </div>
@@ -223,32 +169,35 @@ const LofiControls = ({
           <Button 
             onClick={onProcess} 
             disabled={isProcessing} 
-            className="bg-accent hover:bg-accent/90 text-white font-medium px-8 py-3 text-base min-w-[200px] flex items-center justify-center gap-2"
+            className="bg-accent hover:bg-accent/90 text-white font-medium px-8 py-3 text-base min-w-[200px] flex flex-col items-center justify-center gap-1 relative overflow-hidden"
           >
             {isProcessing ? (
               <>
-                <RefreshCw size={18} className="animate-spin" />
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-sm">{Math.round(processingProgress?.progress || 0)}%</span>
-                  <span className="text-xs opacity-80">{processingProgress?.stage || 'Processing...'}</span>
+                <div className="flex items-center gap-2">
+                  <RefreshCw size={16} className="animate-spin" />
+                  <span>Processing...</span>
                 </div>
+                <div className="w-full mt-1">
+                  <Progress 
+                    value={processingProgress?.progress || 0} 
+                    className="h-1 bg-white/20"
+                  />
+                </div>
+                <span className="text-xs opacity-80 mt-1">
+                  {Math.round(processingProgress?.progress || 0)}% - {processingProgress?.stage || 'Processing...'}
+                </span>
               </>
             ) : (
               <>
-                <Play size={16} />
-                Process Audio
+                <div className="flex items-center gap-2">
+                  <Play size={16} />
+                  <span>Process Audio</span>
+                </div>
               </>
             )}
           </Button>
         </div>
       </div>
-      
-      <PresetManager
-        currentSettings={settings}
-        onLoadPreset={handlePresetLoad}
-        isOpen={showPresetManager}
-        onClose={() => setShowPresetManager(false)}
-      />
     </div>
   );
 };

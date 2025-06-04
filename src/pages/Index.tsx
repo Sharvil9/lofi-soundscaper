@@ -70,6 +70,7 @@ const Index = () => {
     setLofiSettings(settings);
     
     if (isPreviewEnabled && audioProcessorRef.current && audioSource) {
+      // Restart preview with new settings
       audioProcessorRef.current.stopPreview();
       audioProcessorRef.current.startPreview(settings).catch(console.error);
     }
