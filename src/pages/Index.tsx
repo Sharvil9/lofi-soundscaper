@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
 import YouTubeInput from '@/components/YouTubeInput';
@@ -318,38 +317,67 @@ const Index = () => {
             )}
           </div>
           
-          {/* "How it works" section moved to bottom when no audio or after processing */}
-          {(!audioSource || processedBuffer) && (
-            <>
-              <FeatureBanner />
-              
-              <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
-                <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
-                  <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
+          {/* Enhanced Lo-fi Experience - always shown */}
+          <FeatureBanner />
+          
+          {/* "How it works" section - shown before upload OR at bottom after processing */}
+          {!audioSource && (
+            <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
+                <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
+              </div>
+              <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
+                  <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
                 </div>
-                <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
-                  <div>
-                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
-                    <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
-                  </div>
-                  <div>
-                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
-                    <p className="text-sm">Customize the tempo, reverb, filters, and effects intensity</p>
-                  </div>
-                  <div>
-                    <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
-                    <p className="text-sm">Process and save the lo-fi version to your device</p>
-                  </div>
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
+                  <p className="text-sm">Customize the tempo, reverb, filters, and effects intensity</p>
                 </div>
-                
-                <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
-                    🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
-                  </p>
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
+                  <p className="text-sm">Process and save the lo-fi version to your device</p>
                 </div>
               </div>
-            </>
+              
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* "How it works" section moved to bottom after processing */}
+          {processedBuffer && (
+            <div className="mt-16 glass-panel p-8 text-center animate-fade-in-up delay-500">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-accent/10 flex items-center justify-center">
+                <div className="w-8 h-8 bg-accent rounded-full animate-pulse-subtle"></div>
+              </div>
+              <h2 className="text-xl font-medium mb-2 text-gray-900 dark:text-gray-100">How it works</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 text-lofi-600 dark:text-lofi-300">
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">1. Upload an audio file</div>
+                  <p className="text-sm">Select any audio file from your computer (MP3, WAV, FLAC, etc.)</p>
+                </div>
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">2. Adjust lo-fi settings</div>
+                  <p className="text-sm">Customize the tempo, reverb, filters, and effects intensity</p>
+                </div>
+                <div>
+                  <div className="mb-2 text-lofi-800 dark:text-lofi-100 font-medium">3. Download your lo-fi track</div>
+                  <p className="text-sm">Process and save the lo-fi version to your device</p>
+                </div>
+              </div>
+              
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  🎵 <strong>All processing happens on your device!</strong> No uploads to servers, complete privacy.
+                </p>
+              </div>
+            </div>
           )}
         </main>
         
